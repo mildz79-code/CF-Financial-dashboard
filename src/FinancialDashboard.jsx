@@ -194,32 +194,71 @@ const SectionHeader = ({ eyebrow, title, description, action, style }) => (
   </div>
 );
 
-// ─── Expense Detail data ────────────────────────────────────────────────────
+// ─── COGS data & helpers ────────────────────────────────────────────────────
+
+const cogsSummary = [
+  { category: 'Labor',     amount: 4120000, pct: 42.6, color: design.colors.teal },
+  { category: 'Materials', amount: 2510000, pct: 25.9, color: design.colors.mint },
+  { category: 'Utilities', amount: 2560000, pct: 26.5, color: design.colors.coral },
+  { category: 'Other',     amount: 480000,  pct: 5.0,  color: design.colors.slate },
+];
+
+const cogsLineItems = [
+  { category: 'labor',     item: 'Direct Labor — Samuel Hale',         description: 'Primary production contractor', annual: 3410000, pct: 25.7 },
+  { category: 'labor',     item: 'Direct Labor — Workforce',           description: 'Hourly production staff',       annual: 532000,  pct: 4.0  },
+  { category: 'labor',     item: 'Payroll — Other COGS',               description: 'Overtime bonuses',             annual: 178000,  pct: 1.3  },
+  { category: 'materials', item: 'Chemical & Dyestuffs',               description: 'Dyes & chemicals',             annual: 2353000, pct: 17.7 },
+  { category: 'materials', item: 'Finishing Supplies — Paper Tube',    description: 'Packaging tubes',              annual: 98000,   pct: 0.7  },
+  { category: 'materials', item: 'Lab Supplies — Testing',             description: 'Quality testing',              annual: 67000,   pct: 0.5  },
+  { category: 'materials', item: 'Plant Supplies & Parts',             description: 'Machine parts',                annual: 89000,   pct: 0.7  },
+  { category: 'other',     item: 'Freight & Shipping',                 description: 'Logistics',                    annual: 168000,  pct: 1.3  },
+  { category: 'other',     item: 'Truck Repair',                       description: 'Fleet maintenance',            annual: 45000,   pct: 0.3  },
+  { category: 'other',     item: 'Insurance — Liability',              description: 'Plant coverage',               annual: 50000,   pct: 0.4  },
+  { category: 'utilities', item: 'Utilities — Gas',                    description: 'Boiler & heating',             annual: 1207000, pct: 9.1  },
+  { category: 'utilities', item: 'Utilities — Electricity',            description: 'Machine power',                annual: 837000,  pct: 6.3  },
+  { category: 'utilities', item: 'Utilities — Water',                  description: 'Process water',                annual: 345000,  pct: 2.6  },
+  { category: 'utilities', item: 'Utilities — Wastewater',             description: 'Treatment',                    annual: 171000,  pct: 1.3  },
+];
+
+const rowTint = (category) => {
+  if (category === 'labor') return 'rgba(13,79,79,0.05)';
+  if (category === 'utilities') return 'rgba(224,123,84,0.06)';
+  return 'transparent';
+};
+
+// COGS thresholds: items reach 25%+ so scale accordingly
+const cogsPctColor = (pct) => {
+  if (pct >= 5) return design.colors.teal;
+  if (pct >= 1) return design.colors.midTeal;
+  return design.colors.slate;
+};
+
+// ─── Expense Detail data & helpers ─────────────────────────────────────────
 
 const OPEX_DATA = [
-  { label: 'Payroll Admin',          annual: 845000,  pct: 6.4 },
-  { label: 'Payroll Taxes',          annual: 156000,  pct: 1.2 },
-  { label: 'Employee Benefits',      annual: 98000,   pct: 0.7 },
-  { label: 'Rent Expense',           annual: 1052000, pct: 7.9 },
-  { label: 'Rent Management Fee',    annual: 262000,  pct: 2.0 },
-  { label: 'Professional Fees Legal',annual: 72000,   pct: 0.5 },
-  { label: 'Professional Fees Other',annual: 40000,   pct: 0.3 },
-  { label: 'Sales Commission',       annual: 65000,   pct: 0.5 },
-  { label: 'Sales Promotion',        annual: 18000,   pct: 0.1 },
-  { label: 'Office Expense',         annual: 42000,   pct: 0.3 },
-  { label: 'Office Supplies',        annual: 28000,   pct: 0.2 },
-  { label: 'Computer & Internet',    annual: 36000,   pct: 0.3 },
-  { label: 'Telephone',              annual: 22000,   pct: 0.2 },
-  { label: 'Automobile',             annual: 48000,   pct: 0.4 },
-  { label: 'Repairs Computer',       annual: 35000,   pct: 0.3 },
-  { label: 'Repairs Equipment',      annual: 245000,  pct: 1.8 },
-  { label: 'Insurance Health',       annual: 89000,   pct: 0.7 },
-  { label: 'Insurance Truck',        annual: 47000,   pct: 0.4 },
-  { label: 'Licenses',               annual: 15000,   pct: 0.1 },
-  { label: 'Contract Labor',         annual: 126000,  pct: 0.9 },
-  { label: 'Outside Service',        annual: 78000,   pct: 0.6 },
-  { label: 'Interest Expense',       annual: 197000,  pct: 1.5 },
-  { label: 'Other/Misc',             annual: 71000,   pct: 0.5 },
+  { label: 'Payroll Admin',           annual: 845000,  pct: 6.4 },
+  { label: 'Payroll Taxes',           annual: 156000,  pct: 1.2 },
+  { label: 'Employee Benefits',       annual: 98000,   pct: 0.7 },
+  { label: 'Rent Expense',            annual: 1052000, pct: 7.9 },
+  { label: 'Rent Management Fee',     annual: 262000,  pct: 2.0 },
+  { label: 'Professional Fees Legal', annual: 72000,   pct: 0.5 },
+  { label: 'Professional Fees Other', annual: 40000,   pct: 0.3 },
+  { label: 'Sales Commission',        annual: 65000,   pct: 0.5 },
+  { label: 'Sales Promotion',         annual: 18000,   pct: 0.1 },
+  { label: 'Office Expense',          annual: 42000,   pct: 0.3 },
+  { label: 'Office Supplies',         annual: 28000,   pct: 0.2 },
+  { label: 'Computer & Internet',     annual: 36000,   pct: 0.3 },
+  { label: 'Telephone',               annual: 22000,   pct: 0.2 },
+  { label: 'Automobile',              annual: 48000,   pct: 0.4 },
+  { label: 'Repairs Computer',        annual: 35000,   pct: 0.3 },
+  { label: 'Repairs Equipment',       annual: 245000,  pct: 1.8 },
+  { label: 'Insurance Health',        annual: 89000,   pct: 0.7 },
+  { label: 'Insurance Truck',         annual: 47000,   pct: 0.4 },
+  { label: 'Licenses',                annual: 15000,   pct: 0.1 },
+  { label: 'Contract Labor',          annual: 126000,  pct: 0.9 },
+  { label: 'Outside Service',         annual: 78000,   pct: 0.6 },
+  { label: 'Interest Expense',        annual: 197000,  pct: 1.5 },
+  { label: 'Other/Misc',              annual: 71000,   pct: 0.5 },
 ];
 
 const OPEX_TOTAL = OPEX_DATA.reduce((s, r) => s + r.annual, 0); // 3,687,000
@@ -233,11 +272,14 @@ const TOP5 = [
   { label: 'Interest Expense',  annual: 197000  },
 ];
 
-const pctBadgeColor = (pct) => {
+// OpEx thresholds: coral ≥2%, midTeal ≥1%, slate <1%
+const opexPctColor = (pct) => {
   if (pct >= 2) return design.colors.coral;
   if (pct >= 1) return design.colors.midTeal;
   return design.colors.slate;
 };
+
+// ─── Shared table primitives ────────────────────────────────────────────────
 
 const TH = ({ children, align = 'left' }) => (
   <th
@@ -272,6 +314,120 @@ const TD = ({ children, align = 'left', bold, style: extra }) => (
   >
     {children}
   </td>
+);
+
+// ─── COGS Section ───────────────────────────────────────────────────────────
+
+const COGSSection = () => (
+  <section style={{ marginBottom: '48px' }}>
+    <SectionHeader
+      eyebrow="Cost of Goods Sold"
+      title="COGS Details"
+      description="Annual cost breakdown by category and line item for FY 2025."
+    />
+
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, 1fr)',
+        gap: '16px',
+        marginBottom: '24px',
+      }}
+    >
+      {cogsSummary.map(({ category, amount, pct, color }) => (
+        <Card key={category} padding="24px">
+          <div
+            style={{
+              fontSize: '11px',
+              fontWeight: design.font.weights.semibold,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              color,
+              marginBottom: '8px',
+            }}
+          >
+            {category}
+          </div>
+          <div
+            style={{
+              fontSize: '28px',
+              fontWeight: design.font.weights.bold,
+              color: design.colors.darkText,
+              letterSpacing: '-0.01em',
+              marginBottom: '10px',
+            }}
+          >
+            <AnimatedNumber value={amount} />
+          </div>
+          <Badge color={color}>{pct}% of COGS</Badge>
+        </Card>
+      ))}
+    </div>
+
+    <Card padding="0" style={{ overflow: 'hidden' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: design.font.family }}>
+        <thead>
+          <tr style={{ borderBottom: `2px solid ${design.colors.cardBorder}` }}>
+            {['Item', 'Description', 'Annual', '% of COGS'].map((col) => (
+              <th
+                key={col}
+                style={{
+                  padding: '14px 20px',
+                  textAlign: col === 'Annual' || col === '% of COGS' ? 'right' : 'left',
+                  fontSize: '11px',
+                  fontWeight: design.font.weights.semibold,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  color: design.colors.mutedText,
+                }}
+              >
+                {col}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {cogsLineItems.map(({ category, item, description, annual, pct }, i) => (
+            <tr
+              key={i}
+              style={{
+                backgroundColor: rowTint(category),
+                borderBottom: `1px solid ${design.colors.cardBorder}`,
+              }}
+            >
+              <td
+                style={{
+                  padding: '13px 20px',
+                  fontSize: '14px',
+                  fontWeight: design.font.weights.medium,
+                  color: design.colors.darkText,
+                }}
+              >
+                {item}
+              </td>
+              <td style={{ padding: '13px 20px', fontSize: '14px', color: design.colors.mutedText }}>
+                {description}
+              </td>
+              <td
+                style={{
+                  padding: '13px 20px',
+                  fontSize: '14px',
+                  fontWeight: design.font.weights.semibold,
+                  color: design.colors.darkText,
+                  textAlign: 'right',
+                }}
+              >
+                {formatCurrency(annual)}
+              </td>
+              <td style={{ padding: '13px 20px', textAlign: 'right' }}>
+                <Badge color={cogsPctColor(pct)}>{pct}%</Badge>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Card>
+  </section>
 );
 
 // ─── Top-5 Bar Chart ────────────────────────────────────────────────────────
@@ -339,7 +495,6 @@ const TopFiveChart = () => {
                 </span>
               </div>
 
-              {/* Track */}
               <div
                 style={{
                   height: '10px',
@@ -348,7 +503,6 @@ const TopFiveChart = () => {
                   overflow: 'hidden',
                 }}
               >
-                {/* Fill */}
                 <div
                   style={{
                     height: '100%',
@@ -364,7 +518,6 @@ const TopFiveChart = () => {
         })}
       </div>
 
-      {/* Total callout */}
       <div
         style={{
           marginTop: '26px',
@@ -420,7 +573,6 @@ const ExpenseDetailSection = () => (
         alignItems: 'flex-start',
       }}
     >
-      {/* ── Left: full expense table ── */}
       <Card padding="0" style={{ overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
@@ -436,8 +588,7 @@ const ExpenseDetailSection = () => (
               <tr
                 key={row.label}
                 style={{
-                  backgroundColor:
-                    i % 2 === 1 ? 'rgba(13,79,79,0.018)' : 'transparent',
+                  backgroundColor: i % 2 === 1 ? 'rgba(13,79,79,0.018)' : 'transparent',
                   borderBottom: `1px solid ${design.colors.cardBorder}`,
                 }}
               >
@@ -445,14 +596,13 @@ const ExpenseDetailSection = () => (
                 <TD align="right">{formatCurrency(row.annual)}</TD>
                 <TD align="right">{formatCurrency(row.annual / 12)}</TD>
                 <TD align="right" style={{ paddingRight: '20px' }}>
-                  <Badge color={pctBadgeColor(row.pct)}>
+                  <Badge color={opexPctColor(row.pct)}>
                     {row.pct.toFixed(1)}%
                   </Badge>
                 </TD>
               </tr>
             ))}
 
-            {/* Total row */}
             <tr
               style={{
                 backgroundColor: 'rgba(13,79,79,0.04)',
@@ -472,7 +622,6 @@ const ExpenseDetailSection = () => (
         </table>
       </Card>
 
-      {/* ── Right: top-5 bar chart ── */}
       <TopFiveChart />
     </div>
   </section>
@@ -526,6 +675,7 @@ const FinancialDashboard = () => {
             </p>
           </header>
 
+          <COGSSection />
           <ExpenseDetailSection />
         </div>
       </main>
