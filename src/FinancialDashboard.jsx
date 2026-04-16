@@ -194,6 +194,356 @@ const SectionHeader = ({ eyebrow, title, description, action, style }) => (
   </div>
 );
 
+// ── Utilities Data ───────────────────────────────────────────────────────────
+const UTILITY_KPI = [
+  { emoji: '🔥', label: 'Gas',         value: 1207000, pct: '9.1%', color: design.colors.coral   },
+  { emoji: '⚡', label: 'Electricity', value:  837000, pct: '6.3%', color: design.colors.teal    },
+  { emoji: '💧', label: 'Water',       value:  345000, pct: '2.6%', color: design.colors.midTeal },
+  { emoji: '🌊', label: 'Wastewater',  value:  171000, pct: '1.3%', color: design.colors.tan     },
+];
+
+const UTILITY_MONTHLY = [
+  { month: 'Jan', gas: 118, elec:  78, water: 32, waste: 16 },
+  { month: 'Feb', gas: 112, elec:  74, water: 30, waste: 15 },
+  { month: 'Mar', gas:  98, elec:  68, water: 27, waste: 13 },
+  { month: 'Apr', gas:  92, elec:  65, water: 26, waste: 13 },
+  { month: 'May', gas: 105, elec:  72, water: 31, waste: 15 },
+  { month: 'Jun', gas:  98, elec:  70, water: 30, waste: 14 },
+  { month: 'Jul', gas:  88, elec:  66, water: 28, waste: 13 },
+  { month: 'Aug', gas: 102, elec:  71, water: 30, waste: 15 },
+  { month: 'Sep', gas: 108, elec:  74, water: 31, waste: 15 },
+  { month: 'Oct', gas: 100, elec:  70, water: 29, waste: 14 },
+  { month: 'Nov', gas:  96, elec:  67, water: 28, waste: 14 },
+  { month: 'Dec', gas:  90, elec:  62, water: 23, waste: 14 },
+];
+
+const CHART_COLORS = {
+  gas:   design.colors.coral,
+  elec:  design.colors.teal,
+  water: design.colors.midTeal,
+  waste: design.colors.tan,
+};
+
+// ── Utility KPI Card ──────────────────────────────────────────────────────────
+const UtilityKpiCard = ({ emoji, label, value, pct, color }) => (
+  <Card style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div style={{
+      width: 48, height: 48, borderRadius: '14px',
+      background: `${color}20`,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: 22,
+    }}>
+      {emoji}
+    </div>
+    <div>
+      <p style={{
+        margin: '0 0 6px',
+        fontFamily: design.font.family,
+        fontSize: 12,
+        fontWeight: design.font.weights.semibold,
+        color: design.colors.mutedText,
+        letterSpacing: '0.06em',
+        textTransform: 'uppercase',
+      }}>
+        {label}
+      </p>
+      <AnimatedNumber
+        value={value}
+        style={{
+          display: 'block',
+          fontFamily: design.font.family,
+          fontSize: 28,
+          fontWeight: design.font.weights.bold,
+          color: design.colors.darkText,
+          letterSpacing: '-0.02em',
+          lineHeight: 1,
+        }}
+      />
+      <p style={{
+        margin: '8px 0 0',
+        fontFamily: design.font.family,
+        fontSize: 13,
+        fontWeight: design.font.weights.medium,
+        color,
+      }}>
+        {pct} of total costs
+      </p>
+    </div>
+  </Card>
+);
+
+// ── Utility Stacked Bar Chart ─────────────────────────────────────────────────
+const CHART_LEGEND = [
+  { key: 'gas',   label: 'Gas',         color: CHART_COLORS.gas   },
+  { key: 'elec',  label: 'Electricity', color: CHART_COLORS.elec  },
+  { key: 'water', label: 'Water',       color: CHART_COLORS.water },
+  { key: 'waste', label: 'Wastewater',  color: CHART_COLORS.waste },
+];
+
+const UtilityStackedBarChart = () => {
+  const [ref, inView] = useInView({ threshold: 0.15, rootMargin: '0px 0px -5% 0px' });
+  const [progress, setProgress] = useState(0);
+  const frameRef = useRef(null);
+  const startRef = useRef(null);
+  const DURATION = 1000;
+
+  useEffect(() => {
+    if (!inView) return;
+    startRef.current = null;
+    const step = (ts) => {
+      if (!startRef.current) startRef.current = ts;
+      const t = Math.min((ts - startRef.current) / DURATION, 1);
+      setProgress(easeOutCubic(t));
+      if (t < 1) frameRef.current = requestAnimationFrame(step);
+    };
+    frameRef.current = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frameRef.current);
+  }, [inView]);
+
+  const W = 720, H = 300;
+  const padL = 52, padR = 16, padT = 16, padB = 36;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+  const Y_MAX = 260;
+  const toH = (v) => (v / Y_MAX) * plotH;
+  const toY = (v) => plotH - toH(v);
+  const barSlot = plotW / 12;
+  const barW = barSlot * 0.58;
+  const yTicks = [0, 50, 100, 150, 200, 250];
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 16 }}>
+        {CHART_LEGEND.map(({ key, label, color }) => (
+          <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: color }} />
+            <span style={{
+              fontFamily: design.font.family,
+              fontSize: 12,
+              fontWeight: design.font.weights.medium,
+              color: design.colors.mutedText,
+            }}>
+              {label}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div ref={ref} style={{ width: '100%', overflowX: 'auto' }}>
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          style={{ width: '100%', minWidth: 480, height: 'auto', display: 'block' }}
+        >
+          {yTicks.map((tick) => {
+            const y = padT + toY(tick);
+            return (
+              <g key={tick}>
+                <line
+                  x1={padL} y1={y} x2={padL + plotW} y2={y}
+                  stroke={tick === 0 ? 'rgba(13,79,79,0.15)' : 'rgba(13,79,79,0.06)'}
+                  strokeWidth={1}
+                />
+                {tick > 0 && (
+                  <text
+                    x={padL - 8} y={y + 4}
+                    textAnchor="end"
+                    fontSize={10}
+                    fontFamily={design.font.family}
+                    fill={design.colors.mutedText}
+                  >
+                    ${tick}K
+                  </text>
+                )}
+              </g>
+            );
+          })}
+
+          {UTILITY_MONTHLY.map((d, i) => {
+            const cx = padL + i * barSlot + barSlot / 2;
+            const x = cx - barW / 2;
+            const gH = toH(d.gas)   * progress;
+            const eH = toH(d.elec)  * progress;
+            const wH = toH(d.water) * progress;
+            const aH = toH(d.waste) * progress;
+            const totalH = gH + eH + wH + aH;
+            const clipId = `uc${i}`;
+
+            return (
+              <g key={d.month}>
+                <defs>
+                  <clipPath id={clipId}>
+                    <rect x={x} y={padT + plotH - totalH} width={barW} height={totalH} rx={3} />
+                  </clipPath>
+                </defs>
+                <rect x={x} y={padT + plotH - gH}
+                  width={barW} height={gH}
+                  fill={CHART_COLORS.gas} clipPath={`url(#${clipId})`} />
+                <rect x={x} y={padT + plotH - gH - eH}
+                  width={barW} height={eH}
+                  fill={CHART_COLORS.elec} clipPath={`url(#${clipId})`} />
+                <rect x={x} y={padT + plotH - gH - eH - wH}
+                  width={barW} height={wH}
+                  fill={CHART_COLORS.water} clipPath={`url(#${clipId})`} />
+                <rect x={x} y={padT + plotH - gH - eH - wH - aH}
+                  width={barW} height={aH}
+                  fill={CHART_COLORS.waste} clipPath={`url(#${clipId})`} />
+                <text
+                  x={cx} y={padT + plotH + 20}
+                  textAnchor="middle"
+                  fontSize={10}
+                  fontFamily={design.font.family}
+                  fill={design.colors.mutedText}
+                >
+                  {d.month}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+    </div>
+  );
+};
+
+// ── Utility Table ─────────────────────────────────────────────────────────────
+const fmtK = (v) => `$${v}K`;
+
+const UtilityTable = () => {
+  const totals = UTILITY_MONTHLY.reduce(
+    (acc, d) => ({
+      gas:   acc.gas   + d.gas,
+      elec:  acc.elec  + d.elec,
+      water: acc.water + d.water,
+      waste: acc.waste + d.waste,
+    }),
+    { gas: 0, elec: 0, water: 0, waste: 0 }
+  );
+
+  const cellBase = {
+    padding: '10px 16px',
+    fontFamily: design.font.family,
+    fontSize: 13,
+    borderBottom: `1px solid ${design.colors.cardBorder}`,
+  };
+
+  const numCell = (bold, color) => ({
+    ...cellBase,
+    textAlign: 'right',
+    fontWeight: bold ? design.font.weights.semibold : design.font.weights.regular,
+    color: color || design.colors.darkText,
+  });
+
+  const thBase = {
+    padding: '10px 16px',
+    fontFamily: design.font.family,
+    fontSize: 11,
+    fontWeight: design.font.weights.semibold,
+    letterSpacing: '0.06em',
+    textTransform: 'uppercase',
+    borderBottom: `2px solid ${design.colors.cardBorder}`,
+    whiteSpace: 'nowrap',
+  };
+
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 520 }}>
+        <thead>
+          <tr style={{ backgroundColor: 'rgba(13,79,79,0.02)' }}>
+            <th style={{ ...thBase, textAlign: 'left', color: design.colors.mutedText }}>Month</th>
+            <th style={{ ...thBase, textAlign: 'right', color: CHART_COLORS.gas   }}>Gas</th>
+            <th style={{ ...thBase, textAlign: 'right', color: CHART_COLORS.elec  }}>Electricity</th>
+            <th style={{ ...thBase, textAlign: 'right', color: CHART_COLORS.water }}>Water</th>
+            <th style={{ ...thBase, textAlign: 'right', color: CHART_COLORS.waste }}>Wastewater</th>
+            <th style={{ ...thBase, textAlign: 'right', color: design.colors.darkText }}>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {UTILITY_MONTHLY.map((d, i) => {
+            const total = d.gas + d.elec + d.water + d.waste;
+            return (
+              <tr
+                key={d.month}
+                style={{ backgroundColor: i % 2 === 1 ? 'rgba(13,79,79,0.015)' : 'transparent' }}
+              >
+                <td style={{ ...cellBase, textAlign: 'left', fontWeight: design.font.weights.medium, color: design.colors.darkText }}>
+                  {d.month}
+                </td>
+                <td style={numCell(false, CHART_COLORS.gas  )}>{fmtK(d.gas  )}</td>
+                <td style={numCell(false, CHART_COLORS.elec )}>{fmtK(d.elec )}</td>
+                <td style={numCell(false, CHART_COLORS.water)}>{fmtK(d.water)}</td>
+                <td style={numCell(false, CHART_COLORS.waste)}>{fmtK(d.waste)}</td>
+                <td style={numCell(true)}>{fmtK(total)}</td>
+              </tr>
+            );
+          })}
+          <tr style={{ backgroundColor: `${design.colors.teal}0A` }}>
+            <td style={{ ...cellBase, textAlign: 'left', fontWeight: design.font.weights.bold, color: design.colors.darkText, borderBottom: 'none' }}>
+              Total
+            </td>
+            <td style={{ ...numCell(true, CHART_COLORS.gas  ), borderBottom: 'none' }}>{fmtK(totals.gas  )}</td>
+            <td style={{ ...numCell(true, CHART_COLORS.elec ), borderBottom: 'none' }}>{fmtK(totals.elec )}</td>
+            <td style={{ ...numCell(true, CHART_COLORS.water), borderBottom: 'none' }}>{fmtK(totals.water)}</td>
+            <td style={{ ...numCell(true, CHART_COLORS.waste), borderBottom: 'none' }}>{fmtK(totals.waste)}</td>
+            <td style={{ ...numCell(true), borderBottom: 'none' }}>{fmtK(totals.gas + totals.elec + totals.water + totals.waste)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+// ── Utilities Section ─────────────────────────────────────────────────────────
+const UtilitiesSection = () => (
+  <section style={{ marginTop: '56px' }}>
+    <SectionHeader
+      eyebrow="Utilities"
+      title="Utility Costs"
+      description="Annual breakdown of gas, electricity, water, and wastewater expenditures across all 12 months."
+    />
+
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+      gap: '20px',
+      marginBottom: '28px',
+    }}>
+      {UTILITY_KPI.map((kpi) => (
+        <UtilityKpiCard key={kpi.label} {...kpi} />
+      ))}
+    </div>
+
+    <Card style={{ marginBottom: '28px' }} padding="28px">
+      <h3 style={{
+        margin: '0 0 20px',
+        fontFamily: design.font.family,
+        fontWeight: design.font.weights.semibold,
+        fontSize: 15,
+        color: design.colors.darkText,
+        letterSpacing: '-0.01em',
+      }}>
+        Monthly Utilities Trend
+      </h3>
+      <UtilityStackedBarChart />
+    </Card>
+
+    <Card padding="0">
+      <div style={{ padding: '20px 28px 12px' }}>
+        <h3 style={{
+          margin: 0,
+          fontFamily: design.font.family,
+          fontWeight: design.font.weights.semibold,
+          fontSize: 15,
+          color: design.colors.darkText,
+          letterSpacing: '-0.01em',
+        }}>
+          Monthly Utility Breakdown
+        </h3>
+      </div>
+      <UtilityTable />
+      <div style={{ height: 8 }} />
+    </Card>
+  </section>
+);
+
 const FinancialDashboard = () => {
   return (
     <>
@@ -239,6 +589,7 @@ const FinancialDashboard = () => {
               FY 2025 Financial Dashboard
             </p>
           </header>
+          <UtilitiesSection />
         </div>
       </main>
     </>
