@@ -194,6 +194,8 @@ const SectionHeader = ({ eyebrow, title, description, action, style }) => (
   </div>
 );
 
+// ─── COGS Section ─────────────────────────────────────────────────────────────
+
 const cogsSummary = [
   { category: 'Labor', amount: 4120000, pct: 42.6, color: design.colors.teal },
   { category: 'Materials', amount: 2510000, pct: 25.9, color: design.colors.mint },
@@ -342,6 +344,310 @@ const COGSSection = () => (
   </section>
 );
 
+// ─── Monthly Report Data ──────────────────────────────────────────────────────
+
+const MONTHLY_DATA = [
+  { month: 'Jan', revenue: 1132141, cogs: 823600, opex: 265200, net: 43341 },
+  { month: 'Feb', revenue: 1054328, cogs: 767200, opex: 257100, net: 30028 },
+  { month: 'Mar', revenue: 978560,  cogs: 712400, opex: 243800, net: 22360 },
+  { month: 'Apr', revenue: 1098745, cogs: 799800, opex: 258300, net: 40645 },
+  { month: 'May', revenue: 1326890, cogs: 965600, opex: 268500, net: 92790 },
+  { month: 'Jun', revenue: 1189234, cogs: 865700, opex: 242400, net: 81134 },
+  { month: 'Jul', revenue: 1067450, cogs: 777100, opex: 252200, net: 38150 },
+  { month: 'Aug', revenue: 1245670, cogs: 906800, opex: 256600, net: 82270 },
+  { month: 'Sep', revenue: 1298340, cogs: 945200, opex: 264300, net: 88840 },
+  { month: 'Oct', revenue: 1156780, cogs: 842100, opex: 258900, net: 55780 },
+  { month: 'Nov', revenue: 1089432, cogs: 793100, opex: 254700, net: 41632 },
+  { month: 'Dec', revenue: 944430,  cogs: 687400, opex: 250900, net: 6130  },
+].map(r => ({
+  ...r,
+  gp: r.revenue - r.cogs,
+  gpPct: (r.revenue - r.cogs) / r.revenue * 100,
+  netPct: r.net / r.revenue * 100,
+}));
+
+const PEAK_MONTHS = new Set(['May', 'Sep']);
+
+const TOTALS = (() => {
+  const t = MONTHLY_DATA.reduce(
+    (acc, r) => ({
+      revenue: acc.revenue + r.revenue,
+      cogs: acc.cogs + r.cogs,
+      gp: acc.gp + r.gp,
+      opex: acc.opex + r.opex,
+      net: acc.net + r.net,
+    }),
+    { revenue: 0, cogs: 0, gp: 0, opex: 0, net: 0 }
+  );
+  return { ...t, gpPct: t.gp / t.revenue * 100, netPct: t.net / t.revenue * 100 };
+})();
+
+const MAX_NET = Math.max(...MONTHLY_DATA.map(r => r.net));
+
+const netColor = (net) => {
+  if (net > 50000) return design.colors.mint;
+  if (net < 20000) return design.colors.coral;
+  return design.colors.midTeal;
+};
+
+const barColor = (net) => {
+  if (net >= 50000) return design.colors.mint;
+  if (net < 20000) return design.colors.coral;
+  return design.colors.midTeal;
+};
+
+// ─── Monthly Report Components ────────────────────────────────────────────────
+
+const MiniKPI = ({ label, value, sub, accent }) => (
+  <Card padding="20px 24px">
+    <div style={{
+      fontSize: '11px',
+      fontWeight: design.font.weights.semibold,
+      letterSpacing: '0.08em',
+      textTransform: 'uppercase',
+      color: design.colors.mutedText,
+      marginBottom: '10px',
+      fontFamily: design.font.family,
+    }}>
+      {label}
+    </div>
+    <div style={{
+      fontSize: '30px',
+      fontWeight: design.font.weights.bold,
+      color: accent,
+      lineHeight: 1,
+      letterSpacing: '-0.02em',
+      fontFamily: design.font.family,
+    }}>
+      {value}
+    </div>
+    {sub && (
+      <div style={{
+        fontSize: '12px',
+        color: design.colors.mutedText,
+        marginTop: '4px',
+        fontFamily: design.font.family,
+      }}>
+        {sub}
+      </div>
+    )}
+    <div style={{
+      height: '3px',
+      backgroundColor: `${accent}22`,
+      borderRadius: '999px',
+      marginTop: '16px',
+      overflow: 'hidden',
+    }}>
+      <div style={{
+        height: '100%',
+        width: '70%',
+        backgroundColor: accent,
+        borderRadius: '999px',
+        opacity: 0.65,
+      }} />
+    </div>
+  </Card>
+);
+
+const TH = ({ children, align = 'right' }) => (
+  <th style={{
+    padding: '13px 18px',
+    textAlign: align,
+    fontSize: '11px',
+    fontWeight: design.font.weights.semibold,
+    fontFamily: design.font.family,
+    letterSpacing: '0.06em',
+    textTransform: 'uppercase',
+    fontVariant: 'small-caps',
+    color: design.colors.mutedText,
+    borderBottom: '2px solid #EDF1F3',
+    backgroundColor: '#F8FAFB',
+    whiteSpace: 'nowrap',
+  }}>
+    {children}
+  </th>
+);
+
+const MonthlyReport = () => (
+  <section style={{ marginTop: '56px' }}>
+    <SectionHeader
+      eyebrow="Full Year Breakdown"
+      title="Monthly Report"
+      description="Revenue, cost structure, and net profitability across all twelve months of FY 2025."
+    />
+
+    {/* KPI Mini Cards */}
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(4, 1fr)',
+      gap: '16px',
+      marginBottom: '28px',
+    }}>
+      <MiniKPI label="Best Month"     value="$93K"    sub="May"        accent={design.colors.mint}    />
+      <MiniKPI label="Worst Month"    value="$6K"     sub="Dec"        accent={design.colors.coral}   />
+      <MiniKPI label="Avg Net / Mo"   value="$44K"    sub="per month"  accent={design.colors.midTeal} />
+      <MiniKPI label="All Profitable" value="12 / 12" sub="months"     accent={design.colors.teal}    />
+    </div>
+
+    {/* P&L Table */}
+    <Card padding="0" style={{ marginBottom: '28px', overflow: 'hidden' }}>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{
+          width: '100%',
+          borderCollapse: 'collapse',
+          fontFamily: design.font.family,
+          fontSize: '13px',
+          color: design.colors.darkText,
+        }}>
+          <thead>
+            <tr>
+              <TH align="left">Month</TH>
+              <TH>Revenue</TH>
+              <TH>COGS</TH>
+              <TH>Gross Profit</TH>
+              <TH>GP%</TH>
+              <TH>OpEx</TH>
+              <TH>Net Income</TH>
+              <TH>Net%</TH>
+            </tr>
+          </thead>
+          <tbody>
+            {MONTHLY_DATA.map(row => {
+              const isPeak = PEAK_MONTHS.has(row.month);
+              const nc = netColor(row.net);
+              const cell = { padding: '11px 18px', borderBottom: '1px solid #EDF1F3' };
+              return (
+                <tr key={row.month} style={{
+                  backgroundColor: isPeak ? 'rgba(46,196,182,0.06)' : '#fff',
+                }}>
+                  <td style={{ ...cell, textAlign: 'left', fontWeight: design.font.weights.semibold, color: design.colors.darkText }}>
+                    {row.month}
+                    {isPeak && (
+                      <span style={{ marginLeft: '6px', fontSize: '9px', color: design.colors.mint, verticalAlign: 'middle' }}>▲</span>
+                    )}
+                  </td>
+                  <td style={{ ...cell, textAlign: 'right' }}>{formatCurrency(row.revenue)}</td>
+                  <td style={{ ...cell, textAlign: 'right', color: design.colors.mutedText }}>{formatCurrency(row.cogs)}</td>
+                  <td style={{ ...cell, textAlign: 'right' }}>{formatCurrency(row.gp)}</td>
+                  <td style={{ ...cell, textAlign: 'right', color: design.colors.midTeal, fontWeight: design.font.weights.medium }}>{row.gpPct.toFixed(1)}%</td>
+                  <td style={{ ...cell, textAlign: 'right', color: design.colors.mutedText }}>{formatCurrency(row.opex)}</td>
+                  <td style={{ ...cell, textAlign: 'right', color: nc, fontWeight: design.font.weights.semibold }}>{formatCurrency(row.net)}</td>
+                  <td style={{ ...cell, textAlign: 'right', color: nc }}>{row.netPct.toFixed(1)}%</td>
+                </tr>
+              );
+            })}
+
+            {/* TOTAL row */}
+            <tr style={{ backgroundColor: '#EEF2F4' }}>
+              {[
+                { v: 'Total',                          align: 'left',  color: design.colors.darkText,  upper: true },
+                { v: formatCurrency(TOTALS.revenue),   align: 'right', color: design.colors.darkText               },
+                { v: formatCurrency(TOTALS.cogs),      align: 'right', color: design.colors.mutedText              },
+                { v: formatCurrency(TOTALS.gp),        align: 'right', color: design.colors.darkText               },
+                { v: `${TOTALS.gpPct.toFixed(1)}%`,    align: 'right', color: design.colors.midTeal                },
+                { v: formatCurrency(TOTALS.opex),      align: 'right', color: design.colors.mutedText              },
+                { v: formatCurrency(TOTALS.net),       align: 'right', color: design.colors.teal                   },
+                { v: `${TOTALS.netPct.toFixed(1)}%`,   align: 'right', color: design.colors.teal                   },
+              ].map((c, i) => (
+                <td key={i} style={{
+                  padding: '13px 18px',
+                  textAlign: c.align,
+                  fontWeight: design.font.weights.bold,
+                  color: c.color,
+                  fontFamily: design.font.family,
+                  fontSize: c.upper ? '11px' : '13px',
+                  letterSpacing: c.upper ? '0.08em' : 0,
+                  textTransform: c.upper ? 'uppercase' : 'none',
+                  borderTop: '2px solid #D0D8DC',
+                }}>
+                  {c.v}
+                </td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </Card>
+
+    {/* Net Income Bar Chart */}
+    <Card padding="24px 28px">
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: '20px',
+        flexWrap: 'wrap',
+        gap: '12px',
+      }}>
+        <div>
+          <div style={{ fontSize: '14px', fontWeight: design.font.weights.semibold, color: design.colors.darkText, fontFamily: design.font.family }}>
+            Net Income — Monthly Performance
+          </div>
+          <div style={{ fontSize: '12px', color: design.colors.mutedText, marginTop: '2px', fontFamily: design.font.family }}>
+            FY 2025 · all values in USD
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
+          {[
+            { label: 'Strong  >$50K', color: design.colors.mint    },
+            { label: 'Mid  $20–50K',  color: design.colors.midTeal },
+            { label: 'Weak  <$20K',   color: design.colors.coral   },
+          ].map(l => (
+            <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <div style={{ width: 10, height: 10, borderRadius: '3px', backgroundColor: l.color, opacity: 0.85 }} />
+              <span style={{ fontSize: '11px', color: design.colors.mutedText, fontFamily: design.font.family }}>{l.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Bars */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: '7px', height: '110px' }}>
+        {MONTHLY_DATA.map(row => {
+          const barH = Math.max((row.net / MAX_NET) * 110, 4);
+          return (
+            <div
+              key={row.month}
+              title={`${row.month}: ${formatCurrency(row.net)}`}
+              style={{
+                flex: 1,
+                height: `${barH}px`,
+                backgroundColor: barColor(row.net),
+                borderRadius: '4px 4px 2px 2px',
+                opacity: 0.82,
+                cursor: 'default',
+                transition: 'opacity 0.15s ease',
+              }}
+            />
+          );
+        })}
+      </div>
+
+      {/* Baseline */}
+      <div style={{ height: '1px', backgroundColor: '#EDF1F3' }} />
+
+      {/* Month labels */}
+      <div style={{ display: 'flex', gap: '7px', marginTop: '7px' }}>
+        {MONTHLY_DATA.map(row => (
+          <div key={row.month} style={{
+            flex: 1,
+            textAlign: 'center',
+            fontSize: '10px',
+            color: design.colors.mutedText,
+            fontFamily: design.font.family,
+            fontWeight: design.font.weights.medium,
+            letterSpacing: '0.01em',
+          }}>
+            {row.month}
+          </div>
+        ))}
+      </div>
+    </Card>
+  </section>
+);
+
+// ─── Main Dashboard ───────────────────────────────────────────────────────────
+
 const FinancialDashboard = () => {
   return (
     <>
@@ -389,6 +695,7 @@ const FinancialDashboard = () => {
           </header>
 
           <COGSSection />
+          <MonthlyReport />
         </div>
       </main>
     </>
