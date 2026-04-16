@@ -194,6 +194,154 @@ const SectionHeader = ({ eyebrow, title, description, action, style }) => (
   </div>
 );
 
+const cogsSummary = [
+  { category: 'Labor', amount: 4120000, pct: 42.6, color: design.colors.teal },
+  { category: 'Materials', amount: 2510000, pct: 25.9, color: design.colors.mint },
+  { category: 'Utilities', amount: 2560000, pct: 26.5, color: design.colors.coral },
+  { category: 'Other', amount: 480000, pct: 5.0, color: design.colors.slate },
+];
+
+const cogsLineItems = [
+  { category: 'labor', item: 'Direct Labor — Samuel Hale', description: 'Primary production contractor', annual: 3410000, pct: 25.7 },
+  { category: 'labor', item: 'Direct Labor — Workforce', description: 'Hourly production staff', annual: 532000, pct: 4.0 },
+  { category: 'labor', item: 'Payroll — Other COGS', description: 'Overtime bonuses', annual: 178000, pct: 1.3 },
+  { category: 'materials', item: 'Chemical & Dyestuffs', description: 'Dyes & chemicals', annual: 2353000, pct: 17.7 },
+  { category: 'materials', item: 'Finishing Supplies — Paper Tube', description: 'Packaging tubes', annual: 98000, pct: 0.7 },
+  { category: 'materials', item: 'Lab Supplies — Testing', description: 'Quality testing', annual: 67000, pct: 0.5 },
+  { category: 'materials', item: 'Plant Supplies & Parts', description: 'Machine parts', annual: 89000, pct: 0.7 },
+  { category: 'other', item: 'Freight & Shipping', description: 'Logistics', annual: 168000, pct: 1.3 },
+  { category: 'other', item: 'Truck Repair', description: 'Fleet maintenance', annual: 45000, pct: 0.3 },
+  { category: 'other', item: 'Insurance — Liability', description: 'Plant coverage', annual: 50000, pct: 0.4 },
+  { category: 'utilities', item: 'Utilities — Gas', description: 'Boiler & heating', annual: 1207000, pct: 9.1 },
+  { category: 'utilities', item: 'Utilities — Electricity', description: 'Machine power', annual: 837000, pct: 6.3 },
+  { category: 'utilities', item: 'Utilities — Water', description: 'Process water', annual: 345000, pct: 2.6 },
+  { category: 'utilities', item: 'Utilities — Wastewater', description: 'Treatment', annual: 171000, pct: 1.3 },
+];
+
+const rowTint = (category) => {
+  if (category === 'labor') return 'rgba(13,79,79,0.05)';
+  if (category === 'utilities') return 'rgba(224,123,84,0.06)';
+  return 'transparent';
+};
+
+const pctBadgeColor = (pct) => {
+  if (pct >= 5) return design.colors.teal;
+  if (pct >= 1) return design.colors.midTeal;
+  return design.colors.slate;
+};
+
+const COGSSection = () => (
+  <section style={{ marginBottom: '48px' }}>
+    <SectionHeader
+      eyebrow="Cost of Goods Sold"
+      title="COGS Details"
+      description="Annual cost breakdown by category and line item for FY 2025."
+    />
+
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, 1fr)',
+        gap: '16px',
+        marginBottom: '24px',
+      }}
+    >
+      {cogsSummary.map(({ category, amount, pct, color }) => (
+        <Card key={category} padding="24px">
+          <div
+            style={{
+              fontSize: '11px',
+              fontWeight: design.font.weights.semibold,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              color,
+              marginBottom: '8px',
+            }}
+          >
+            {category}
+          </div>
+          <div
+            style={{
+              fontSize: '28px',
+              fontWeight: design.font.weights.bold,
+              color: design.colors.darkText,
+              letterSpacing: '-0.01em',
+              marginBottom: '10px',
+            }}
+          >
+            <AnimatedNumber value={amount} />
+          </div>
+          <Badge color={color}>{pct}% of COGS</Badge>
+        </Card>
+      ))}
+    </div>
+
+    <Card padding="0">
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: design.font.family }}>
+        <thead>
+          <tr style={{ borderBottom: `2px solid ${design.colors.cardBorder}` }}>
+            {['Item', 'Description', 'Annual', '% of COGS'].map((col) => (
+              <th
+                key={col}
+                style={{
+                  padding: '14px 20px',
+                  textAlign: col === 'Annual' || col === '% of COGS' ? 'right' : 'left',
+                  fontSize: '11px',
+                  fontWeight: design.font.weights.semibold,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  color: design.colors.mutedText,
+                }}
+              >
+                {col}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {cogsLineItems.map(({ category, item, description, annual, pct }, i) => (
+            <tr
+              key={i}
+              style={{
+                backgroundColor: rowTint(category),
+                borderBottom: `1px solid ${design.colors.cardBorder}`,
+              }}
+            >
+              <td
+                style={{
+                  padding: '13px 20px',
+                  fontSize: '14px',
+                  fontWeight: design.font.weights.medium,
+                  color: design.colors.darkText,
+                }}
+              >
+                {item}
+              </td>
+              <td style={{ padding: '13px 20px', fontSize: '14px', color: design.colors.mutedText }}>
+                {description}
+              </td>
+              <td
+                style={{
+                  padding: '13px 20px',
+                  fontSize: '14px',
+                  fontWeight: design.font.weights.semibold,
+                  color: design.colors.darkText,
+                  textAlign: 'right',
+                }}
+              >
+                {formatCurrency(annual)}
+              </td>
+              <td style={{ padding: '13px 20px', textAlign: 'right' }}>
+                <Badge color={pctBadgeColor(pct)}>{pct}%</Badge>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Card>
+  </section>
+);
+
 const FinancialDashboard = () => {
   return (
     <>
@@ -239,6 +387,8 @@ const FinancialDashboard = () => {
               FY 2025 Financial Dashboard
             </p>
           </header>
+
+          <COGSSection />
         </div>
       </main>
     </>
