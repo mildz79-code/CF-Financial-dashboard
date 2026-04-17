@@ -6,8 +6,9 @@ Financial reporting and P&L analysis for **Color Fashion Dye & Finishing**.
 
 The dashboard now runs as a Vite React app and includes:
 
-- Existing FY2025 static design sections (overview, COGS, payroll, utilities, expenses, monthly report)
-- New **2026 Snapshot (Supabase)** section with source toggle (`actual`, `budget`, `forecast`) backed by `pl_category_summary`
+- Live year switcher for **2026** and **2024**
+- Source toggle (`actual`, `budget`, `forecast`) backed by Supabase views
+- Dedicated **2024 Section** in the sidebar and main content for baseline analysis
 
 ### Local run
 
@@ -25,7 +26,7 @@ VITE_SUPABASE_URL=...
 VITE_SUPABASE_ANON_KEY=...
 ```
 
-If env vars are missing, the app still loads and shows a guidance message in the 2026 Snapshot section.
+If env vars are missing, the app still loads and shows a guidance message in the live snapshot section.
 
 ## Structure
 
@@ -47,7 +48,8 @@ If env vars are missing, the app still loads and shows a guidance message in the
 │       ├── 001_create_pl_tables.sql      # pl_line_items + pl_monthly
 │       ├── 002_create_pl_views.sql       # pl_monthly_wide + pl_category_summary
 │       ├── 003_create_storage_bucket.sql # private 'financials' bucket
-│       └── 004_seed_2026_data.sql        # 2026 line items + Q1 actuals + budget
+│       ├── 004_seed_2026_data.sql        # 2026 line items + Q1 actuals + budget
+│       └── 005_seed_2024_data.sql        # 2024 synthetic baseline actuals + budget + forecast
 ├── docs/
 │   └── SCHEMA.md                     # Database schema reference
 ├── .env.example
@@ -131,3 +133,12 @@ Or via the dashboard: Storage → `financials` bucket → Upload file.
 Monthly Net Income: Jan $31,555 · Feb ($64,318) · Mar $151,735.
 
 Reconciles to the 2026 Q1 Balance Sheet Net Income line exactly.
+
+## 2024 Data Availability
+
+- New migration: `supabase/migrations/005_seed_2024_data.sql`
+- Seeds **2024** monthly values across all line items for:
+  - `actual`
+  - `budget`
+  - `forecast`
+- Enables the dashboard’s dedicated **2024 Section** and year toggle behavior.

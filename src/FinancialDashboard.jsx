@@ -59,6 +59,34 @@ const sectionHeader = (title, subtitle) => (
   </div>
 );
 
+
+
+const YearSwitcher = ({ year, setYear, availableYears = [2026, 2024] }) => (
+  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+    {availableYears.map((y) => {
+      const active = y === year;
+      return (
+        <button
+          key={y}
+          type="button"
+          onClick={() => setYear(y)}
+          style={{
+            border: 'none',
+            borderRadius: 999,
+            cursor: 'pointer',
+            padding: '6px 12px',
+            fontWeight: 600,
+            color: active ? '#fff' : '#0D4F4F',
+            background: active ? '#0D4F4F' : 'rgba(13,79,79,0.12)',
+          }}
+        >
+          {y}
+        </button>
+      );
+    })}
+  </div>
+);
+
 const SourceSwitcher = ({ source, setSource, availableSources }) => (
   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
     {sourceOrder.filter((s) => availableSources.includes(s)).map((s) => {
@@ -161,7 +189,8 @@ const LineItemsTop = ({ title, items, totalBase, color }) => (
 );
 
 const FinancialDashboard = () => {
-  const { loading, error, data } = useDashboardDataset(2026);
+  const [year, setYear] = useState(2026);
+  const { loading, error, data } = useDashboardDataset(year);
   const [source, setSource] = useState('actual');
   const [activeSection, setActiveSection] = useState('snapshot');
 
@@ -246,10 +275,11 @@ const FinancialDashboard = () => {
           <div style={{ padding: '0 10px 16px' }}>
             <div style={{ width: 40, height: 40, borderRadius: 10, display: 'grid', placeItems: 'center', background: 'linear-gradient(135deg,#0D4F4F,#1A8A8A)', color: '#fff', fontWeight: 800, marginBottom: 10 }}>CF</div>
             <div style={{ fontWeight: 700, color: '#1A3A4A' }}>Color Fashion</div>
-            <div style={{ fontSize: 12, color: '#5A7A8A' }}>2026 Live Dashboard</div>
+            <div style={{ fontSize: 12, color: '#5A7A8A' }}>{year} Live Dashboard</div>
           </div>
           {[
-            ['snapshot', '2026 Snapshot'],
+            ['snapshot', `${year} Snapshot`],
+            ['prior-year', '2024 Section'],
             ['overview', 'Overview'],
             ['cogs', 'COGS Details'],
             ['payroll', 'Payroll Analysis'],
@@ -285,9 +315,13 @@ const FinancialDashboard = () => {
 
         <main className="cf-main" style={{ flex: 1, padding: 40 }}>
           <div style={{ marginBottom: 18 }}>
-            <span style={{ fontSize: 12, padding: '4px 10px', borderRadius: 999, background: 'rgba(13,79,79,0.12)', color: '#0D4F4F', fontWeight: 700 }}>FY 2026 Live Dashboard</span>
+            <span style={{ fontSize: 12, padding: '4px 10px', borderRadius: 999, background: 'rgba(13,79,79,0.12)', color: '#0D4F4F', fontWeight: 700 }}>{`FY ${year} Live Dashboard`}</span>
             <h1 style={{ margin: '10px 0 6px', color: '#0D4F4F', fontSize: 38 }}>Color Fashion Dye &amp; Finishing</h1>
             <p style={{ margin: 0, color: '#5A7A8A', fontSize: 17 }}>Supabase-driven P&amp;L Dashboard (Actual · Budget · Forecast)</p>
+          </div>
+
+          <div style={{ marginBottom: 10 }}>
+            <YearSwitcher year={year} setYear={setYear} availableYears={[2026, 2024]} />
           </div>
 
           <div style={{ marginBottom: 18 }}>
@@ -309,13 +343,13 @@ const FinancialDashboard = () => {
           ) : (
             <>
               <section id="snapshot" data-section="snapshot" style={{ marginBottom: 38, scrollMarginTop: 80 }}>
-                {sectionHeader('2026 Snapshot (Supabase)', `Source: ${sourceMeta[source].label} · Monthly P&L totals from pl_category_summary`)}
+                {sectionHeader(`${year} Snapshot (Supabase)`, `Source: ${sourceMeta[source].label} · Monthly P&L totals from pl_category_summary`)}
                 <KpiGrid totals={current.totals} />
                 <MonthlyTable rows={current.rows} />
               </section>
 
               <section id="overview" data-section="overview" style={{ marginBottom: 38, scrollMarginTop: 80 }}>
-                {sectionHeader('Overview', `High-level 2026 ${sourceMeta[source].label} performance`)}
+                {sectionHeader('Overview', `High-level ${year} ${sourceMeta[source].label} performance`)}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(150px,1fr))', gap: 12 }}>
                   {[
                     { label: 'Best Month', value: formatCurrency(peak.netIncome), sub: peak.month, color: '#2EC4B6' },
@@ -333,27 +367,43 @@ const FinancialDashboard = () => {
               </section>
 
               <section id="cogs" data-section="cogs" style={{ marginBottom: 38, scrollMarginTop: 80 }}>
-                {sectionHeader('COGS Details', `Top COGS line items in 2026 ${sourceMeta[source].label}`)}
+                {sectionHeader('COGS Details', `Top COGS line items in ${year} ${sourceMeta[source].label}`)}
                 <LineItemsTop title="Top COGS" items={cogsItems.slice(0, 10)} totalBase={sumYear(cogsItems) || 1} color="#0D4F4F" />
               </section>
 
               <section id="payroll" data-section="payroll" style={{ marginBottom: 38, scrollMarginTop: 80 }}>
-                {sectionHeader('Payroll Analysis', `Payroll-related lines in 2026 ${sourceMeta[source].label}`)}
+                {sectionHeader('Payroll Analysis', `Payroll-related lines in ${year} ${sourceMeta[source].label}`)}
                 <LineItemsTop title="Payroll Items" items={payrollItems.slice(0, 10)} totalBase={sumYear(payrollItems) || 1} color="#1A8A8A" />
               </section>
 
               <section id="utilities" data-section="utilities" style={{ marginBottom: 38, scrollMarginTop: 80 }}>
-                {sectionHeader('Utility Costs', `Utility-related lines in 2026 ${sourceMeta[source].label}`)}
+                {sectionHeader('Utility Costs', `Utility-related lines in ${year} ${sourceMeta[source].label}`)}
                 <LineItemsTop title="Utility Items" items={utilityItems.slice(0, 10)} totalBase={sumYear(utilityItems) || 1} color="#E07B54" />
               </section>
 
               <section id="expenses" data-section="expenses" style={{ marginBottom: 38, scrollMarginTop: 80 }}>
-                {sectionHeader('Expense Detail', `Top OpEx lines in 2026 ${sourceMeta[source].label}`)}
+                {sectionHeader('Expense Detail', `Top OpEx lines in ${year} ${sourceMeta[source].label}`)}
                 <LineItemsTop title="Top OpEx" items={opexItems.slice(0, 12)} totalBase={sumYear(opexItems) || 1} color="#94A7B0" />
               </section>
 
+
+
+              <section id="prior-year" data-section="prior-year" style={{ marginBottom: 38, scrollMarginTop: 80 }}>
+                {sectionHeader('2024 Section', 'Dedicated view of FY 2024 actual data for baseline comparison')}
+                {year === 2024 ? (
+                  <>
+                    <KpiGrid totals={current.totals} />
+                    <MonthlyTable rows={current.rows} />
+                  </>
+                ) : (
+                  <div style={{ ...cardStyle, padding: 14 }}>
+                    Switch year selector to <strong>2024</strong> to view the dedicated 2024 dataset and monthly detail.
+                  </div>
+                )}
+              </section>
+
               <section id="monthly" data-section="monthly" style={{ marginBottom: 10, scrollMarginTop: 80 }}>
-                {sectionHeader('Monthly Report', `2026 ${sourceMeta[source].label} month-by-month P&L`)}
+                {sectionHeader('Monthly Report', `${year} ${sourceMeta[source].label} month-by-month P&L`)}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(150px,1fr))', gap: 12, marginBottom: 12 }}>
                   <div style={{ ...cardStyle, padding: 14 }}><div style={{ fontSize: 11, color: '#5A7A8A', textTransform: 'uppercase' }}>Profitable Months</div><div style={{ fontSize: 28, fontWeight: 800, color: '#0D4F4F' }}>{activeRows.filter((r) => r.netIncome > 0).length} / {activeRows.length || 12}</div></div>
                   <div style={{ ...cardStyle, padding: 14 }}><div style={{ fontSize: 11, color: '#5A7A8A', textTransform: 'uppercase' }}>Avg Net / Active Mo</div><div style={{ fontSize: 28, fontWeight: 800, color: '#1A8A8A' }}>{formatCurrency(activeRows.length ? current.totals.netIncome / activeRows.length : 0)}</div></div>
