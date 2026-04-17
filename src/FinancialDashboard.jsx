@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
+import { useFinancialData } from './useFinancialData';
 
 /* ==========================================================================
    1. SHARED FOUNDATION — Design Tokens & Global Helpers
@@ -225,42 +226,53 @@ const SectionHeader = ({ eyebrow, title, description, action, style }) => (
 
 // ─── KPI Cards ────────────────────────────────────────────────────────────────
 
-const kpiData = [
-  {
-    label: 'Revenue',
-    value: 13280000,
-    badge: '+7.3% YoY',
-    badgeColor: '#16a34a',
-    sub: 'Total FY 2025',
-    accent: design.colors.midTeal,
-  },
-  {
-    label: 'Gross Profit',
-    value: 3610000,
-    badge: '27.2% Margin',
-    badgeColor: design.colors.midTeal,
-    sub: 'After COGS',
-    accent: design.colors.mint,
-  },
-  {
-    label: 'Net Income',
-    value: 523000,
-    badge: '3.9% Margin',
-    badgeColor: design.colors.coral,
-    sub: 'After All Expenses',
-    accent: design.colors.coral,
-  },
-  {
-    label: 'COGS',
-    value: 9670000,
-    badge: '72.8% of Revenue',
-    badgeColor: design.colors.tan,
-    sub: 'Cost of Goods Sold',
-    accent: design.colors.tan,
-  },
-];
+const buildKpiData = (data) => {
+  if (!data) return [];
+  const { totals, margins, actualMonthsCount } = data;
+  const periodLabel = actualMonthsCount === 12
+    ? `Full Year ${data.year}`
+    : `Q${Math.ceil(actualMonthsCount / 3)} ${data.year} YTD`;
+  const cogsRatio = totals.revenue.actual > 0
+    ? ((totals.cogs.actual / totals.revenue.actual) * 100).toFixed(1)
+    : '0.0';
+  return [
+    {
+      label: 'Revenue',
+      value: totals.revenue.actual,
+      badge: periodLabel,
+      badgeColor: design.colors.midTeal,
+      sub: `${periodLabel}`,
+      accent: design.colors.midTeal,
+    },
+    {
+      label: 'Gross Profit',
+      value: totals.grossProfit.actual,
+      badge: `${margins.gross.toFixed(1)}% Margin`,
+      badgeColor: design.colors.midTeal,
+      sub: 'After COGS',
+      accent: design.colors.mint,
+    },
+    {
+      label: 'Net Income',
+      value: totals.netIncome.actual,
+      badge: `${margins.net.toFixed(1)}% Margin`,
+      badgeColor: design.colors.coral,
+      sub: 'After All Expenses',
+      accent: design.colors.coral,
+    },
+    {
+      label: 'COGS',
+      value: totals.cogs.actual,
+      badge: `${cogsRatio}% of Revenue`,
+      badgeColor: design.colors.tan,
+      sub: 'Cost of Goods Sold',
+      accent: design.colors.tan,
+    },
+  ];
+};
 
-const KPICards = () => {
+const KPICards = ({ data }) => {
+  const kpiData = useMemo(() => buildKpiData(data), [data]);
   const [ref, inView] = useInView({ threshold: 0.1 });
 
   return (
@@ -342,38 +354,26 @@ const KPICards = () => {
 
 // ─── Monthly Revenue Bar Chart ────────────────────────────────────────────────
 
-const monthlyRevenue = [
-  { month: 'Jan', value: 1080000 },
-  { month: 'Feb', value: 1050000 },
-  { month: 'Mar', value: 1120000 },
-  { month: 'Apr', value: 1090000 },
-  { month: 'May', value: 1330000 },
-  { month: 'Jun', value: 1150000 },
-  { month: 'Jul', value: 1070000 },
-  { month: 'Aug', value: 1100000 },
-  { month: 'Sep', value: 1280000 },
-  { month: 'Oct', value: 1010000 },
-  { month: 'Nov', value: 960000 },
-  { month: 'Dec', value: 944000 },
-];
-
-const highlightMonths = new Set(['May', 'Sep']);
-const chartMax = Math.max(...monthlyRevenue.map((d) => d.value)) * 1.08;
-
-const MonthlyRevenueChart = () => {
+const MonthlyRevenueChart = ({ data }) => {
   const [ref, inView] = useInView({ threshold: 0.15 });
 
-  const avg = monthlyRevenue.reduce((s, d) => s + d.value, 0) / monthlyRevenue.length;
-  const peak = Math.max(...monthlyRevenue.map((d) => d.value));
-  const low = Math.min(...monthlyRevenue.map((d) => d.value));
+  const monthlyRevenue = data ? data.monthlyRevenue.map((m) => ({ month: m.month, value: m.actual })) : [];
+  const activeMonths = monthlyRevenue.filter((m) => m.value > 0);
+  const values = activeMonths.map((m) => m.value);
+  const avg = values.length > 0 ? values.reduce((s, v) => s + v, 0) / values.length : 0;
+  const peak = values.length > 0 ? Math.max(...values) : 0;
+  const low = values.length > 0 ? Math.min(...values) : 0;
   const spread = peak - low;
+  const chartMax = peak * 1.08 || 1;
+  const peakMonth = activeMonths.find((m) => m.value === peak);
+  const highlightMonths = new Set(peakMonth ? [peakMonth.month] : []);
 
   return (
     <Card padding="28px" style={{ marginBottom: '32px' }}>
       <SectionHeader
         eyebrow="Revenue Trend"
         title="Monthly Revenue"
-        description="FY 2025 monthly revenue — May and September were peak months."
+        description={data ? `${data.year} monthly revenue — ${data.actualMonthsCount} month${data.actualMonthsCount !== 1 ? 's' : ''} of actuals loaded.` : 'Loading...'}
         style={{ marginBottom: '28px' }}
       />
       <div
@@ -438,10 +438,10 @@ const MonthlyRevenueChart = () => {
         }}
       >
         {[
-          { label: 'Monthly Avg', value: '$1.11M' },
-          { label: 'Peak Month', value: '$1.33M' },
-          { label: 'Low Month', value: '$944K' },
-          { label: 'Peak–Low Spread', value: '$383K' },
+          { label: 'Monthly Avg', value: formatCurrency(avg) },
+          { label: 'Peak Month', value: formatCurrency(peak) },
+          { label: 'Low Month', value: formatCurrency(low) },
+          { label: 'Peak–Low Spread', value: formatCurrency(spread) },
         ].map((stat, i) => (
           <div
             key={stat.label}
@@ -482,14 +482,37 @@ const MonthlyRevenueChart = () => {
 
 // ─── Expense Allocation Donut ─────────────────────────────────────────────────
 
-const expenseSlices = [
-  { label: 'Payroll', pct: 30.5, color: '#0D4F4F' },
-  { label: 'Materials', pct: 20.5, color: '#1A8A8A' },
-  { label: 'Utilities', pct: 19.3, color: '#2EC4B6' },
-  { label: 'Rent', pct: 10.6, color: '#E07B54' },
-  { label: 'Prof Fees', pct: 1.9, color: '#D4A574' },
-  { label: 'Other', pct: 17.2, color: '#94A7B0' },
-];
+const SLICE_COLORS = ['#0D4F4F', '#1A8A8A', '#2EC4B6', '#E07B54', '#D4A574', '#94A7B0'];
+
+function buildExpenseSlices(data) {
+  if (!data) return [];
+  const { totals, byLabel } = data;
+  const totalExpenses = totals.cogs.actual + totals.opex.actual;
+  if (totalExpenses === 0) return [];
+
+  const payrollLabels = ['Direct Labor - Samuel Hale', 'Direct Labor - Workforce', 'Payroll - Other', 'Payroll Expenses (Admin)', 'Payroll Taxes', 'Employee Benefits'];
+  const materialLabels = ['Chemical & Dyestuffs', 'Finishing Supplies - Paper Tube', 'Finishing Supplies - Poly Bags', 'Lab Supplies (Testing)', 'Plant Supplies & Parts'];
+  const utilityLabels = ['Utilities - Electricity', 'Utilities - Gas', 'Utilities - Water', 'Utilities - Wastewater'];
+  const rentLabels = ['Rent Expense', 'Rent Management Fee'];
+
+  const sumGroup = (labels) => labels.reduce((s, l) => s + (byLabel[l] ? byLabel[l].actual.reduce((a, b) => a + b, 0) : 0), 0);
+
+  const payroll = sumGroup(payrollLabels);
+  const materials = sumGroup(materialLabels);
+  const utilities = sumGroup(utilityLabels);
+  const rent = sumGroup(rentLabels);
+  const profFees = sumGroup(['Professional Fees - Legal', 'Professional Fees - Trucking', 'Professional Fees - Other']);
+  const other = totalExpenses - payroll - materials - utilities - rent - profFees;
+
+  return [
+    { label: 'Payroll', pct: +(payroll / totalExpenses * 100).toFixed(1), color: SLICE_COLORS[0] },
+    { label: 'Materials', pct: +(materials / totalExpenses * 100).toFixed(1), color: SLICE_COLORS[1] },
+    { label: 'Utilities', pct: +(utilities / totalExpenses * 100).toFixed(1), color: SLICE_COLORS[2] },
+    { label: 'Rent', pct: +(rent / totalExpenses * 100).toFixed(1), color: SLICE_COLORS[3] },
+    { label: 'Prof Fees', pct: +(profFees / totalExpenses * 100).toFixed(1), color: SLICE_COLORS[4] },
+    { label: 'Other', pct: +(other / totalExpenses * 100).toFixed(1), color: SLICE_COLORS[5] },
+  ].filter((s) => s.pct > 0);
+}
 
 const polarToCartesian = (cx, cy, r, angleDeg) => {
   const rad = ((angleDeg - 90) * Math.PI) / 180;
@@ -505,10 +528,13 @@ const describeArc = (cx, cy, innerR, outerR, startAngle, endAngle) => {
   return `M ${s1.x} ${s1.y} A ${outerR} ${outerR} 0 ${large} 1 ${e1.x} ${e1.y} L ${s2.x} ${s2.y} A ${innerR} ${innerR} 0 ${large} 0 ${e2.x} ${e2.y} Z`;
 };
 
-const DonutChart = () => {
+const DonutChart = ({ data }) => {
   const [hovered, setHovered] = useState(null);
   const [ref, inView] = useInView({ threshold: 0.15 });
   const cx = 110, cy = 110, innerR = 60, outerR = 98, expandR = 105;
+
+  const expenseSlices = useMemo(() => buildExpenseSlices(data), [data]);
+  const totalExpenses = data ? data.totals.cogs.actual + data.totals.opex.actual : 0;
 
   let cumAngle = 0;
   const slicesWithAngles = expenseSlices.map((s) => {
@@ -523,7 +549,7 @@ const DonutChart = () => {
       <SectionHeader
         eyebrow="Cost Breakdown"
         title="Expense Allocation"
-        description="FY 2025 — $12.76M total expenses"
+        description={data ? `${data.year} — ${formatCurrency(totalExpenses)} total expenses` : 'Loading...'}
         style={{ marginBottom: '20px' }}
       />
       <div ref={ref} style={{ display: 'flex', alignItems: 'center', gap: '32px', flexWrap: 'wrap' }}>
@@ -561,7 +587,7 @@ const DonutChart = () => {
               fill: design.colors.darkText,
             }}
           >
-            $12.76M
+            {formatCurrency(totalExpenses)}
           </text>
           <text
             x={cx}
@@ -633,21 +659,36 @@ const DonutChart = () => {
 
 // ─── COGS + OpEx Tables (Overview) ────────────────────────────────────────────
 
-const cogsItems = [
-  { label: 'Raw Materials', amount: 4850000, pct: 50.2 },
-  { label: 'Direct Labor', amount: 2920000, pct: 30.2 },
-  { label: 'Dye & Chemicals', amount: 1140000, pct: 11.8 },
-  { label: 'Freight & Logistics', amount: 460000, pct: 4.8 },
-  { label: 'Other COGS', amount: 300000, pct: 3.1 },
-];
+function buildOverviewCogsItems(data) {
+  if (!data) return [];
+  const totalCogs = data.totals.cogs.actual;
+  if (totalCogs === 0) return [];
+  const items = data.cogsBreakdown
+    .filter((i) => i.actual > 0)
+    .map((i) => ({ label: i.label, amount: i.actual, pct: +((i.actual / totalCogs) * 100).toFixed(1) }));
+  if (items.length > 5) {
+    const top4 = items.slice(0, 4);
+    const rest = items.slice(4).reduce((s, i) => s + i.amount, 0);
+    return [...top4, { label: 'Other COGS', amount: rest, pct: +((rest / totalCogs) * 100).toFixed(1) }];
+  }
+  return items;
+}
 
-const opexItems = [
-  { label: 'Payroll (Admin)', amount: 1420000, pct: 44.7 },
-  { label: 'Rent & Occupancy', amount: 485000, pct: 15.3 },
-  { label: 'Utilities', amount: 880000, pct: 27.7 },
-  { label: 'Professional Fees', amount: 88000, pct: 2.8 },
-  { label: 'Other OpEx', amount: 303000, pct: 9.5 },
-];
+function buildOverviewOpexItems(data) {
+  if (!data) return [];
+  const totalOpex = data.totals.opex.actual;
+  if (totalOpex === 0) return [];
+  const items = data.opexBreakdown
+    .filter((i) => i.actual > 0)
+    .sort((a, b) => b.actual - a.actual)
+    .map((i) => ({ label: i.label, amount: i.actual, pct: +((i.actual / totalOpex) * 100).toFixed(1) }));
+  if (items.length > 5) {
+    const top4 = items.slice(0, 4);
+    const rest = items.slice(4).reduce((s, i) => s + i.amount, 0);
+    return [...top4, { label: 'Other OpEx', amount: rest, pct: +((rest / totalOpex) * 100).toFixed(1) }];
+  }
+  return items;
+}
 
 const SummaryTable = ({ title, items, total, accentColor }) => (
   <Card padding="24px" style={{ flex: 1 }}>
@@ -714,61 +755,75 @@ const SummaryTable = ({ title, items, total, accentColor }) => (
   </Card>
 );
 
-// ─── YoY Growth Bars ──────────────────────────────────────────────────────────
+// ─── Actual vs Budget Bars ──────────────────────────────────────────────────
 
-const yoyMetrics = [
-  { label: 'Revenue', val2024: 100, val2025: 107.3, change: '+7.3%' },
-  { label: 'Net Income', val2024: 100, val2025: 184.2, change: '+84.2%' },
-  { label: 'Gross Margin', val2024: 100, val2025: 104.2, change: '+4.2%' },
-  { label: 'Net Margin', val2024: 100, val2025: 169.6, change: '+69.6%' },
-];
+function buildVarianceMetrics(data) {
+  if (!data) return [];
+  const { totals, margins } = data;
+  const revBudget = totals.revenue.budget || 1;
+  const revVar = totals.revenue.budget > 0 ? ((totals.revenue.actual / totals.revenue.budget - 1) * 100).toFixed(1) : 'N/A';
+  const niVar = totals.netIncome.budget !== 0 ? ((totals.netIncome.actual / Math.abs(totals.netIncome.budget) - 1) * 100).toFixed(1) : 'N/A';
+  const gpBudget = totals.grossProfit.budget || 1;
+  const gpVar = totals.grossProfit.budget > 0 ? ((totals.grossProfit.actual / totals.grossProfit.budget - 1) * 100).toFixed(1) : 'N/A';
 
-const YoYGrowth = () => {
+  const maxVal = Math.max(
+    totals.revenue.actual, totals.revenue.budget,
+    totals.netIncome.actual, Math.abs(totals.netIncome.budget),
+    totals.grossProfit.actual, totals.grossProfit.budget
+  ) || 1;
+
+  return [
+    { label: 'Revenue', valActual: totals.revenue.actual, valBudget: totals.revenue.budget, change: revVar === 'N/A' ? revVar : `${revVar > 0 ? '+' : ''}${revVar}%`, maxVal },
+    { label: 'Gross Profit', valActual: totals.grossProfit.actual, valBudget: totals.grossProfit.budget, change: gpVar === 'N/A' ? gpVar : `${gpVar > 0 ? '+' : ''}${gpVar}%`, maxVal },
+    { label: 'Net Income', valActual: totals.netIncome.actual, valBudget: totals.netIncome.budget, change: niVar === 'N/A' ? niVar : `${niVar > 0 ? '+' : ''}${niVar}%`, maxVal },
+  ];
+}
+
+const YoYGrowth = ({ data }) => {
   const [ref, inView] = useInView({ threshold: 0.15 });
-  const maxVal = 184.2;
+  const metrics = useMemo(() => buildVarianceMetrics(data), [data]);
+  const maxVal = metrics.length > 0 ? metrics[0].maxVal : 1;
 
   return (
     <Card padding="28px" style={{ flex: 1 }}>
       <SectionHeader
-        eyebrow="Year-over-Year"
-        title="YoY Growth"
-        description="2024 baseline vs. 2025 actuals (indexed to 100)"
+        eyebrow="Actual vs Budget"
+        title="Variance Analysis"
+        description={data ? `${data.year} YTD actuals vs. original budget` : 'Loading...'}
         style={{ marginBottom: '24px' }}
       />
       <div ref={ref} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        {yoyMetrics.map((m, i) => (
+        {metrics.map((m, i) => (
           <div key={m.label}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
               <span style={{ fontFamily: design.font.family, fontSize: '13px', fontWeight: design.font.weights.semibold, color: design.colors.darkText }}>
                 {m.label}
               </span>
-              <Badge color="#16a34a">{m.change}</Badge>
+              <Badge color={String(m.change).startsWith('+') ? '#16a34a' : design.colors.coral}>{m.change}</Badge>
             </div>
-            {/* 2024 bar */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-              <span style={{ fontFamily: design.font.family, fontSize: '11px', color: design.colors.mutedText, width: '34px' }}>2024</span>
+              <span style={{ fontFamily: design.font.family, fontSize: '11px', color: design.colors.mutedText, width: '48px' }}>Budget</span>
               <div style={{ flex: 1, height: '8px', borderRadius: '999px', backgroundColor: `${design.colors.cardBorder}` }}>
                 <div
                   style={{
                     height: '100%',
                     borderRadius: '999px',
                     backgroundColor: '#CBD5DC',
-                    width: inView ? `${(m.val2024 / maxVal) * 100}%` : '0%',
+                    width: inView ? `${Math.max(0, (m.valBudget / maxVal) * 100)}%` : '0%',
                     transition: `width 0.7s ease ${i * 80}ms`,
                   }}
                 />
               </div>
             </div>
-            {/* 2025 bar */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontFamily: design.font.family, fontSize: '11px', color: design.colors.mutedText, width: '34px' }}>2025</span>
+              <span style={{ fontFamily: design.font.family, fontSize: '11px', color: design.colors.mutedText, width: '48px' }}>Actual</span>
               <div style={{ flex: 1, height: '8px', borderRadius: '999px', backgroundColor: `${design.colors.cardBorder}` }}>
                 <div
                   style={{
                     height: '100%',
                     borderRadius: '999px',
                     background: `linear-gradient(to right, ${design.colors.teal}, ${design.colors.mint})`,
-                    width: inView ? `${(m.val2025 / maxVal) * 100}%` : '0%',
+                    width: inView ? `${Math.max(0, (m.valActual / maxVal) * 100)}%` : '0%',
                     transition: `width 0.7s ease ${i * 80 + 100}ms`,
                   }}
                 />
@@ -783,7 +838,7 @@ const YoYGrowth = () => {
 
 // ─── Profitability Banner ─────────────────────────────────────────────────────
 
-const ProfitabilityBanner = () => (
+const ProfitabilityBanner = ({ data }) => (
   <div
     style={{
       borderRadius: design.radius.card,
@@ -809,7 +864,7 @@ const ProfitabilityBanner = () => (
           marginBottom: '6px',
         }}
       >
-        FY 2025 Profitability Summary
+        {data ? `${data.year} Profitability Summary` : 'Profitability Summary'}
       </div>
       <div
         style={{
@@ -825,9 +880,9 @@ const ProfitabilityBanner = () => (
     </div>
     <div style={{ display: 'flex', gap: '0', flexWrap: 'wrap' }}>
       {[
-        { label: 'Gross Margin', value: '27.2%' },
-        { label: 'Net Margin', value: '3.9%' },
-        { label: 'Monthly Avg Revenue', value: '$1.11M' },
+        { label: 'Gross Margin', value: data ? `${data.margins.gross.toFixed(1)}%` : '-' },
+        { label: 'Net Margin', value: data ? `${data.margins.net.toFixed(1)}%` : '-' },
+        { label: 'Monthly Avg Revenue', value: data ? formatCurrency(data.totals.revenue.actual / (data.actualMonthsCount || 1)) : '-' },
       ].map((stat, i) => (
         <div
           key={stat.label}
@@ -866,75 +921,101 @@ const ProfitabilityBanner = () => (
 
 // ─── Overview Section ─────────────────────────────────────────────────────────
 
-const OverviewSection = () => (
-  <section
-    id="overview"
-    data-section="overview"
-    style={{ scrollMarginTop: '80px', paddingTop: '48px', marginBottom: '64px' }}
-  >
-    <SectionHeader
-      eyebrow="Overview"
-      title="Financial Highlights"
-      description="FY 2025 full-year performance at a glance — revenue, profitability, cost structure, and year-over-year growth."
-    />
+const OverviewSection = ({ data }) => {
+  const cogsItems = useMemo(() => buildOverviewCogsItems(data), [data]);
+  const opexItems = useMemo(() => buildOverviewOpexItems(data), [data]);
 
-    <KPICards />
-    <MonthlyRevenueChart />
-
-    {/* Donut + YoY side by side */}
-    <div style={{ display: 'flex', gap: '20px', marginBottom: '32px', flexWrap: 'wrap' }}>
-      <DonutChart />
-      <YoYGrowth />
-    </div>
-
-    {/* COGS + OpEx tables */}
-    <div style={{ display: 'flex', gap: '20px', marginBottom: '0', flexWrap: 'wrap' }}>
-      <SummaryTable
-        title="COGS Breakdown"
-        items={cogsItems}
-        total={9670000}
-        accentColor={design.colors.teal}
+  return (
+    <section
+      id="overview"
+      data-section="overview"
+      style={{ scrollMarginTop: '80px', paddingTop: '48px', marginBottom: '64px' }}
+    >
+      <SectionHeader
+        eyebrow="Overview"
+        title="Financial Highlights"
+        description={data ? `${data.year} Q${Math.ceil(data.actualMonthsCount / 3)} performance at a glance — revenue, profitability, cost structure, and budget variance.` : 'Loading...'}
       />
-      <SummaryTable
-        title="Operating Expenses"
-        items={opexItems}
-        total={3176000}
-        accentColor={design.colors.coral}
-      />
-    </div>
 
-    <ProfitabilityBanner />
-  </section>
-);
+      <KPICards data={data} />
+      <MonthlyRevenueChart data={data} />
+
+      <div style={{ display: 'flex', gap: '20px', marginBottom: '32px', flexWrap: 'wrap' }}>
+        <DonutChart data={data} />
+        <YoYGrowth data={data} />
+      </div>
+
+      <div style={{ display: 'flex', gap: '20px', marginBottom: '0', flexWrap: 'wrap' }}>
+        <SummaryTable
+          title="COGS Breakdown"
+          items={cogsItems}
+          total={data ? data.totals.cogs.actual : 0}
+          accentColor={design.colors.teal}
+        />
+        <SummaryTable
+          title="Operating Expenses"
+          items={opexItems}
+          total={data ? data.totals.opex.actual : 0}
+          accentColor={design.colors.coral}
+        />
+      </div>
+
+      <ProfitabilityBanner data={data} />
+    </section>
+  );
+};
 
 /* ==========================================================================
    3. COGS SECTION — from PR #8 (claude/add-expense-details-kdZm4)
       Uses PR #8's version which has cogsPctColor
    ========================================================================== */
 
-const cogsSummary = [
-  { category: 'Labor',     amount: 4120000, pct: 42.6, color: design.colors.teal },
-  { category: 'Materials', amount: 2510000, pct: 25.9, color: design.colors.mint },
-  { category: 'Utilities', amount: 2560000, pct: 26.5, color: design.colors.coral },
-  { category: 'Other',     amount: 480000,  pct: 5.0,  color: design.colors.slate },
-];
+const COGS_CATEGORY_MAP = {
+  'Direct Labor - Samuel Hale': 'labor',
+  'Direct Labor - Workforce': 'labor',
+  'Payroll - Other': 'labor',
+  'Chemical & Dyestuffs': 'materials',
+  'Finishing Supplies - Paper Tube': 'materials',
+  'Finishing Supplies - Poly Bags': 'materials',
+  'Lab Supplies (Testing)': 'materials',
+  'Plant Supplies & Parts': 'materials',
+  'Utilities - Electricity': 'utilities',
+  'Utilities - Gas': 'utilities',
+  'Utilities - Water': 'utilities',
+  'Utilities - Wastewater': 'utilities',
+};
 
-const cogsLineItems = [
-  { category: 'labor',     item: 'Direct Labor — Samuel Hale',         description: 'Primary production contractor', annual: 3410000, pct: 25.7 },
-  { category: 'labor',     item: 'Direct Labor — Workforce',           description: 'Hourly production staff',       annual: 532000,  pct: 4.0  },
-  { category: 'labor',     item: 'Payroll — Other COGS',               description: 'Overtime bonuses',             annual: 178000,  pct: 1.3  },
-  { category: 'materials', item: 'Chemical & Dyestuffs',               description: 'Dyes & chemicals',             annual: 2353000, pct: 17.7 },
-  { category: 'materials', item: 'Finishing Supplies — Paper Tube',    description: 'Packaging tubes',              annual: 98000,   pct: 0.7  },
-  { category: 'materials', item: 'Lab Supplies — Testing',             description: 'Quality testing',              annual: 67000,   pct: 0.5  },
-  { category: 'materials', item: 'Plant Supplies & Parts',             description: 'Machine parts',                annual: 89000,   pct: 0.7  },
-  { category: 'other',     item: 'Freight & Shipping',                 description: 'Logistics',                    annual: 168000,  pct: 1.3  },
-  { category: 'other',     item: 'Truck Repair',                       description: 'Fleet maintenance',            annual: 45000,   pct: 0.3  },
-  { category: 'other',     item: 'Insurance — Liability',              description: 'Plant coverage',               annual: 50000,   pct: 0.4  },
-  { category: 'utilities', item: 'Utilities — Gas',                    description: 'Boiler & heating',             annual: 1207000, pct: 9.1  },
-  { category: 'utilities', item: 'Utilities — Electricity',            description: 'Machine power',                annual: 837000,  pct: 6.3  },
-  { category: 'utilities', item: 'Utilities — Water',                  description: 'Process water',                annual: 345000,  pct: 2.6  },
-  { category: 'utilities', item: 'Utilities — Wastewater',             description: 'Treatment',                    annual: 171000,  pct: 1.3  },
-];
+function buildCogsSummary(data) {
+  if (!data) return [];
+  const totalCogs = data.totals.cogs.actual;
+  if (totalCogs === 0) return [];
+  const groups = { Labor: 0, Materials: 0, Utilities: 0, Other: 0 };
+  data.cogsBreakdown.forEach((item) => {
+    const cat = COGS_CATEGORY_MAP[item.label];
+    if (cat === 'labor') groups.Labor += item.actual;
+    else if (cat === 'materials') groups.Materials += item.actual;
+    else if (cat === 'utilities') groups.Utilities += item.actual;
+    else groups.Other += item.actual;
+  });
+  const colors = { Labor: design.colors.teal, Materials: design.colors.mint, Utilities: design.colors.coral, Other: design.colors.slate };
+  return Object.entries(groups)
+    .filter(([, v]) => v > 0)
+    .map(([cat, amount]) => ({ category: cat, amount, pct: +((amount / totalCogs) * 100).toFixed(1), color: colors[cat] }));
+}
+
+function buildCogsLineItems(data) {
+  if (!data) return [];
+  const totalCogs = data.totals.cogs.actual;
+  return data.cogsBreakdown
+    .filter((i) => i.actual > 0)
+    .map((i) => ({
+      category: COGS_CATEGORY_MAP[i.label] || 'other',
+      item: i.label,
+      description: '',
+      annual: i.actual,
+      pct: totalCogs > 0 ? +((i.actual / totalCogs) * 100).toFixed(1) : 0,
+    }));
+}
 
 const rowTint = (category) => {
   if (category === 'labor') return 'rgba(13,79,79,0.05)';
@@ -949,7 +1030,11 @@ const cogsPctColor = (pct) => {
   return design.colors.slate;
 };
 
-const COGSSection = () => (
+const COGSSection = ({ data }) => {
+  const cogsSummary = useMemo(() => buildCogsSummary(data), [data]);
+  const cogsLineItems = useMemo(() => buildCogsLineItems(data), [data]);
+
+  return (
   <section
     id="cogs"
     data-section="cogs"
@@ -958,13 +1043,13 @@ const COGSSection = () => (
     <SectionHeader
       eyebrow="Cost of Goods Sold"
       title="COGS Details"
-      description="Annual cost breakdown by category and line item for FY 2025."
+      description={data ? `Cost breakdown by category and line item for ${data.year}.` : 'Loading...'}
     />
 
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(4, 1fr)',
+        gridTemplateColumns: `repeat(${Math.min(cogsSummary.length, 4)}, 1fr)`,
         gap: '16px',
         marginBottom: '24px',
       }}
@@ -1063,25 +1148,46 @@ const COGSSection = () => (
       </table>
     </Card>
   </section>
-);
+  );
+};
 
 /* ==========================================================================
    4. PAYROLL SECTION — from PR #6 (claude/add-payroll-section-SQ6YB)
    ========================================================================== */
 
-const PAYROLL_ITEMS = [
-  { name: 'Samuel Hale',   amount: 3_410_000, monthly: 284_000, description: 'Primary production contractor', category: 'COGS' },
-  { name: 'Admin Payroll', amount:   845_000, monthly:  70_000, description: 'Office staff',                  category: 'OpEx' },
-  { name: 'Workforce',     amount:   532_000, monthly:  44_000, description: 'Hourly production',              category: 'COGS' },
-  { name: 'Payroll Other', amount:   178_000, monthly:  15_000, description: 'Overtime bonuses',              category: 'COGS' },
-  { name: 'Payroll Taxes', amount:   156_000, monthly:  13_000, description: 'Employer taxes',                category: 'OpEx' },
-  { name: 'Contract Labor',amount:   126_000, monthly:  11_000, description: 'Temp workers',                  category: 'OpEx' },
-  { name: 'Benefits',      amount:    98_000, monthly:   8_000, description: 'Health & retirement',           category: 'OpEx' },
-];
+const PAYROLL_LABEL_META = {
+  'Direct Labor - Samuel Hale': { name: 'Samuel Hale', description: 'Primary production contractor', category: 'COGS' },
+  'Direct Labor - Workforce': { name: 'Workforce', description: 'Hourly production', category: 'COGS' },
+  'Payroll - Other': { name: 'Payroll Other', description: 'Overtime bonuses', category: 'COGS' },
+  'Payroll Expenses (Admin)': { name: 'Admin Payroll', description: 'Office staff', category: 'OpEx' },
+  'Payroll Taxes': { name: 'Payroll Taxes', description: 'Employer taxes', category: 'OpEx' },
+  'Employee Benefits': { name: 'Benefits', description: 'Health & retirement', category: 'OpEx' },
+  'Contract Labor': { name: 'Contract Labor', description: 'Temp workers', category: 'OpEx' },
+};
 
-const PayrollBarChart = () => {
+function buildPayrollItems(data) {
+  if (!data) return [];
+  const { payrollItems, byLabel } = data;
+  const contractLabor = byLabel['Contract Labor'];
+  const all = [...payrollItems];
+  if (contractLabor) {
+    const actual = contractLabor.actual.reduce((a, b) => a + b, 0);
+    if (actual > 0) all.push({ label: 'Contract Labor', actual, monthly: contractLabor.actual });
+  }
+  const months = data.actualMonthsCount || 1;
+  return all
+    .filter((i) => i.actual > 0)
+    .sort((a, b) => b.actual - a.actual)
+    .map((i) => {
+      const meta = PAYROLL_LABEL_META[i.label] || { name: i.label, description: '', category: 'COGS' };
+      return { ...meta, amount: i.actual, monthly: Math.round(i.actual / months) };
+    });
+}
+
+const PayrollBarChart = ({ items }) => {
   const [ref, inView] = useInView({ threshold: 0.1 });
-  const maxAmount = PAYROLL_ITEMS[0].amount;
+  const PAYROLL_ITEMS = items;
+  const maxAmount = PAYROLL_ITEMS.length > 0 ? PAYROLL_ITEMS[0].amount : 1;
 
   return (
     <div ref={ref} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
@@ -1167,7 +1273,17 @@ const PayrollBarChart = () => {
   );
 };
 
-const PayrollSection = () => (
+const PayrollSection = ({ data }) => {
+  const payrollItems = useMemo(() => buildPayrollItems(data), [data]);
+  const cogsPayroll = payrollItems.filter((i) => i.category === 'COGS').reduce((s, i) => s + i.amount, 0);
+  const opexPayroll = payrollItems.filter((i) => i.category === 'OpEx').reduce((s, i) => s + i.amount, 0);
+  const totalPayroll = cogsPayroll + opexPayroll;
+  const revActual = data ? data.totals.revenue.actual : 1;
+  const cogsPct = revActual > 0 ? ((cogsPayroll / revActual) * 100).toFixed(1) : '0.0';
+  const opexPct = revActual > 0 ? ((opexPayroll / revActual) * 100).toFixed(1) : '0.0';
+  const totalPct = revActual > 0 ? ((totalPayroll / revActual) * 100).toFixed(1) : '0.0';
+
+  return (
   <section
     id="payroll"
     data-section="payroll"
@@ -1176,10 +1292,9 @@ const PayrollSection = () => (
     <SectionHeader
       eyebrow="Workforce Cost"
       title="Payroll Analysis"
-      description="Full-year payroll breakdown across production (COGS) and administrative (OpEx) categories."
+      description={data ? `${data.year} payroll breakdown across production (COGS) and administrative (OpEx) categories.` : 'Loading...'}
     />
 
-    {/* Summary cards */}
     <div style={{
       display: 'grid',
       gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
@@ -1190,7 +1305,7 @@ const PayrollSection = () => (
         <Badge color={design.colors.teal}>COGS</Badge>
         <div style={{ marginTop: '16px' }}>
           <AnimatedNumber
-            value={4_120_000}
+            value={cogsPayroll}
             style={{
               fontFamily: design.font.family,
               fontWeight: design.font.weights.extrabold,
@@ -1214,7 +1329,7 @@ const PayrollSection = () => (
             fontSize: '13px',
             color: design.colors.mutedText,
           }}>
-            31.0% of revenue
+            {cogsPct}% of revenue
           </div>
         </div>
       </Card>
@@ -1223,7 +1338,7 @@ const PayrollSection = () => (
         <Badge color={design.colors.coral}>OpEx</Badge>
         <div style={{ marginTop: '16px' }}>
           <AnimatedNumber
-            value={1_230_000}
+            value={opexPayroll}
             style={{
               fontFamily: design.font.family,
               fontWeight: design.font.weights.extrabold,
@@ -1247,7 +1362,7 @@ const PayrollSection = () => (
             fontSize: '13px',
             color: design.colors.mutedText,
           }}>
-            9.2% of revenue
+            {opexPct}% of revenue
           </div>
         </div>
       </Card>
@@ -1298,7 +1413,7 @@ const PayrollSection = () => (
       {/* Scrollable wrapper ensures chart stays usable on narrow screens */}
       <div className="cf-table-wrap">
         <div style={{ minWidth: '520px' }}>
-          <PayrollBarChart />
+          <PayrollBarChart items={payrollItems} />
         </div>
       </div>
     </Card>
@@ -1313,8 +1428,8 @@ const PayrollSection = () => (
       gap: '24px',
     }}>
       {[
-        { value: '$5.35M',  sub: null,              label: 'Total Payroll'    },
-        { value: '40.3%',   sub: 'of revenue',      label: 'Headcount Cost'  },
+        { value: formatCurrency(totalPayroll),  sub: null,              label: 'Total Payroll'    },
+        { value: `${totalPct}%`,   sub: 'of revenue',      label: 'Headcount Cost'  },
         { value: '~18%',    sub: 'employer overhead',label: 'Burden Rate'     },
       ].map(({ value, sub, label }) => (
         <div key={label} style={{ textAlign: 'center' }}>
@@ -1354,33 +1469,44 @@ const PayrollSection = () => (
       ))}
     </div>
   </section>
-);
+  );
+};
 
 /* ==========================================================================
    5. UTILITIES SECTION — from PR #7 (claude/add-utilities-section-keSOV)
    ========================================================================== */
 
-const UTILITY_KPI = [
-  { emoji: '\u{1F525}', label: 'Gas',         value: 1207000, pct: '9.1%', color: design.colors.coral   },
-  { emoji: '\u26A1',    label: 'Electricity', value:  837000, pct: '6.3%', color: design.colors.teal    },
-  { emoji: '\u{1F4A7}', label: 'Water',       value:  345000, pct: '2.6%', color: design.colors.midTeal },
-  { emoji: '\u{1F30A}', label: 'Wastewater',  value:  171000, pct: '1.3%', color: design.colors.tan     },
-];
+function buildUtilityKPI(data) {
+  if (!data) return [];
+  const totalCosts = data.totals.cogs.actual + data.totals.opex.actual;
+  const utilityMap = {
+    'Utilities - Gas': { emoji: '\u{1F525}', label: 'Gas', color: design.colors.coral },
+    'Utilities - Electricity': { emoji: '\u26A1', label: 'Electricity', color: design.colors.teal },
+    'Utilities - Water': { emoji: '\u{1F4A7}', label: 'Water', color: design.colors.midTeal },
+    'Utilities - Wastewater': { emoji: '\u{1F30A}', label: 'Wastewater', color: design.colors.tan },
+  };
+  return data.utilityItems.map((item) => {
+    const meta = utilityMap[item.label] || { emoji: '', label: item.label, color: design.colors.slate };
+    const pct = totalCosts > 0 ? ((item.actual / totalCosts) * 100).toFixed(1) : '0.0';
+    return { ...meta, value: item.actual, pct: `${pct}%` };
+  });
+}
 
-const UTILITY_MONTHLY = [
-  { month: 'Jan', gas: 118, elec:  78, water: 32, waste: 16 },
-  { month: 'Feb', gas: 112, elec:  74, water: 30, waste: 15 },
-  { month: 'Mar', gas:  98, elec:  68, water: 27, waste: 13 },
-  { month: 'Apr', gas:  92, elec:  65, water: 26, waste: 13 },
-  { month: 'May', gas: 105, elec:  72, water: 31, waste: 15 },
-  { month: 'Jun', gas:  98, elec:  70, water: 30, waste: 14 },
-  { month: 'Jul', gas:  88, elec:  66, water: 28, waste: 13 },
-  { month: 'Aug', gas: 102, elec:  71, water: 30, waste: 15 },
-  { month: 'Sep', gas: 108, elec:  74, water: 31, waste: 15 },
-  { month: 'Oct', gas: 100, elec:  70, water: 29, waste: 14 },
-  { month: 'Nov', gas:  96, elec:  67, water: 28, waste: 14 },
-  { month: 'Dec', gas:  90, elec:  62, water: 23, waste: 14 },
-];
+function buildUtilityMonthly(data) {
+  if (!data) return [];
+  const { byLabel, months } = data;
+  const gas = byLabel['Utilities - Gas'];
+  const elec = byLabel['Utilities - Electricity'];
+  const water = byLabel['Utilities - Water'];
+  const waste = byLabel['Utilities - Wastewater'];
+  return months.map((m, i) => ({
+    month: m,
+    gas: gas ? Math.round(gas.actual[i] / 1000) : 0,
+    elec: elec ? Math.round(elec.actual[i] / 1000) : 0,
+    water: water ? Math.round(water.actual[i] / 1000) : 0,
+    waste: waste ? Math.round(waste.actual[i] / 1000) : 0,
+  }));
+}
 
 const CHART_COLORS = {
   gas:   design.colors.coral,
@@ -1443,7 +1569,8 @@ const CHART_LEGEND = [
   { key: 'waste', label: 'Wastewater',  color: CHART_COLORS.waste },
 ];
 
-const UtilityStackedBarChart = () => {
+const UtilityStackedBarChart = ({ monthlyData }) => {
+  const UTILITY_MONTHLY = monthlyData;
   const [ref, inView] = useInView({ threshold: 0.15, rootMargin: '0px 0px -5% 0px' });
   const [progress, setProgress] = useState(0);
   const frameRef = useRef(null);
@@ -1569,7 +1696,8 @@ const UtilityStackedBarChart = () => {
 
 const fmtK = (v) => `$${v}K`;
 
-const UtilityTable = () => {
+const UtilityTable = ({ monthlyData }) => {
+  const UTILITY_MONTHLY = monthlyData;
   const totals = UTILITY_MONTHLY.reduce(
     (acc, d) => ({
       gas:   acc.gas   + d.gas,
@@ -1653,7 +1781,11 @@ const UtilityTable = () => {
   );
 };
 
-const UtilitiesSection = () => (
+const UtilitiesSection = ({ data }) => {
+  const utilityKPI = useMemo(() => buildUtilityKPI(data), [data]);
+  const utilityMonthly = useMemo(() => buildUtilityMonthly(data), [data]);
+
+  return (
   <section
     id="utilities"
     data-section="utilities"
@@ -1662,7 +1794,7 @@ const UtilitiesSection = () => (
     <SectionHeader
       eyebrow="Utilities"
       title="Utility Costs"
-      description="Annual breakdown of gas, electricity, water, and wastewater expenditures across all 12 months."
+      description={data ? `${data.year} breakdown of gas, electricity, water, and wastewater expenditures.` : 'Loading...'}
     />
 
     <div style={{
@@ -1671,7 +1803,7 @@ const UtilitiesSection = () => (
       gap: '20px',
       marginBottom: '28px',
     }}>
-      {UTILITY_KPI.map((kpi) => (
+      {utilityKPI.map((kpi) => (
         <UtilityKpiCard key={kpi.label} {...kpi} />
       ))}
     </div>
@@ -1687,7 +1819,7 @@ const UtilitiesSection = () => (
       }}>
         Monthly Utilities Trend
       </h3>
-      <UtilityStackedBarChart />
+      <UtilityStackedBarChart monthlyData={utilityMonthly} />
     </Card>
 
     <Card padding="0">
@@ -1703,52 +1835,32 @@ const UtilitiesSection = () => (
           Monthly Utility Breakdown
         </h3>
       </div>
-      <UtilityTable />
+      <UtilityTable monthlyData={utilityMonthly} />
       <div style={{ height: 8 }} />
     </Card>
   </section>
-);
+  );
+};
 
 /* ==========================================================================
    6. EXPENSE DETAIL SECTION — from PR #8 (claude/add-expense-details-kdZm4)
    ========================================================================== */
 
-const OPEX_DATA = [
-  { label: 'Payroll Admin',           annual: 845000,  pct: 6.4 },
-  { label: 'Payroll Taxes',           annual: 156000,  pct: 1.2 },
-  { label: 'Employee Benefits',       annual: 98000,   pct: 0.7 },
-  { label: 'Rent Expense',            annual: 1052000, pct: 7.9 },
-  { label: 'Rent Management Fee',     annual: 262000,  pct: 2.0 },
-  { label: 'Professional Fees Legal', annual: 72000,   pct: 0.5 },
-  { label: 'Professional Fees Other', annual: 40000,   pct: 0.3 },
-  { label: 'Sales Commission',        annual: 65000,   pct: 0.5 },
-  { label: 'Sales Promotion',         annual: 18000,   pct: 0.1 },
-  { label: 'Office Expense',          annual: 42000,   pct: 0.3 },
-  { label: 'Office Supplies',         annual: 28000,   pct: 0.2 },
-  { label: 'Computer & Internet',     annual: 36000,   pct: 0.3 },
-  { label: 'Telephone',               annual: 22000,   pct: 0.2 },
-  { label: 'Automobile',              annual: 48000,   pct: 0.4 },
-  { label: 'Repairs Computer',        annual: 35000,   pct: 0.3 },
-  { label: 'Repairs Equipment',       annual: 245000,  pct: 1.8 },
-  { label: 'Insurance Health',        annual: 89000,   pct: 0.7 },
-  { label: 'Insurance Truck',         annual: 47000,   pct: 0.4 },
-  { label: 'Licenses',                annual: 15000,   pct: 0.1 },
-  { label: 'Contract Labor',          annual: 126000,  pct: 0.9 },
-  { label: 'Outside Service',         annual: 78000,   pct: 0.6 },
-  { label: 'Interest Expense',        annual: 197000,  pct: 1.5 },
-  { label: 'Other/Misc',              annual: 71000,   pct: 0.5 },
-];
-
-const OPEX_TOTAL = OPEX_DATA.reduce((s, r) => s + r.annual, 0); // 3,687,000
-const OPEX_PCT_TOTAL = OPEX_DATA.reduce((s, r) => s + r.pct, 0); // 27.8
-
-const TOP5 = [
-  { label: 'Rent Expense',      annual: 1052000 },
-  { label: 'Payroll Admin',     annual: 845000  },
-  { label: 'Rent Mgmt Fee',     annual: 262000  },
-  { label: 'Repairs Equipment', annual: 245000  },
-  { label: 'Interest Expense',  annual: 197000  },
-];
+function buildOpexData(data) {
+  if (!data) return { opexData: [], opexTotal: 0, opexPctTotal: 0, top5: [] };
+  const revActual = data.totals.revenue.actual || 1;
+  const opexData = data.opexBreakdown
+    .filter((i) => i.actual > 0)
+    .map((i) => ({
+      label: i.label,
+      annual: i.actual,
+      pct: +((i.actual / revActual) * 100).toFixed(1),
+    }));
+  const opexTotal = opexData.reduce((s, r) => s + r.annual, 0);
+  const opexPctTotal = +((opexTotal / revActual) * 100).toFixed(1);
+  const top5 = [...opexData].sort((a, b) => b.annual - a.annual).slice(0, 5);
+  return { opexData, opexTotal, opexPctTotal, top5 };
+}
 
 // OpEx thresholds: coral >= 2%, midTeal >= 1%, slate < 1%
 const opexPctColor = (pct) => {
@@ -1801,9 +1913,11 @@ const BAR_COLORS = [
   design.colors.slate,
 ];
 
-const TopFiveChart = () => {
+const TopFiveChart = ({ top5, opexTotal }) => {
   const [ref, inView] = useInView({ threshold: 0.25 });
-  const max = TOP5[0].annual;
+  const TOP5 = top5;
+  const OPEX_TOTAL = opexTotal;
+  const max = TOP5.length > 0 ? TOP5[0].annual : 1;
 
   return (
     <Card style={{ alignSelf: 'flex-start' }}>
@@ -1916,7 +2030,10 @@ const TopFiveChart = () => {
   );
 };
 
-const ExpenseDetailSection = () => (
+const ExpenseDetailSection = ({ data }) => {
+  const { opexData: OPEX_DATA, opexTotal: OPEX_TOTAL, opexPctTotal: OPEX_PCT_TOTAL, top5 } = useMemo(() => buildOpexData(data), [data]);
+
+  return (
   <section
     id="expenses"
     data-section="expenses"
@@ -1925,7 +2042,7 @@ const ExpenseDetailSection = () => (
     <SectionHeader
       eyebrow="Operating Expenses"
       title="Expense Detail"
-      description="Full breakdown of 23 operating expense line items for FY 2025. Badge color reflects share of revenue: coral >= 2%, teal >= 1%, slate < 1%."
+      description={data ? `Full breakdown of ${OPEX_DATA.length} operating expense line items for ${data.year}. Badge color reflects share of revenue.` : 'Loading...'}
     />
 
     <div
@@ -1985,53 +2102,51 @@ const ExpenseDetailSection = () => (
         </table>
       </Card>
 
-      <TopFiveChart />
+      <TopFiveChart top5={top5} opexTotal={OPEX_TOTAL} />
     </div>
   </section>
-);
+  );
+};
 
 /* ==========================================================================
    7. MONTHLY REPORT — from main
       MonthlyTH renamed from main's TH to avoid conflict with PR #8's TH
    ========================================================================== */
 
-const MONTHLY_DATA = [
-  { month: 'Jan', revenue: 1132141, cogs: 823600, opex: 265200, net: 43341 },
-  { month: 'Feb', revenue: 1054328, cogs: 767200, opex: 257100, net: 30028 },
-  { month: 'Mar', revenue: 978560,  cogs: 712400, opex: 243800, net: 22360 },
-  { month: 'Apr', revenue: 1098745, cogs: 799800, opex: 258300, net: 40645 },
-  { month: 'May', revenue: 1326890, cogs: 965600, opex: 268500, net: 92790 },
-  { month: 'Jun', revenue: 1189234, cogs: 865700, opex: 242400, net: 81134 },
-  { month: 'Jul', revenue: 1067450, cogs: 777100, opex: 252200, net: 38150 },
-  { month: 'Aug', revenue: 1245670, cogs: 906800, opex: 256600, net: 82270 },
-  { month: 'Sep', revenue: 1298340, cogs: 945200, opex: 264300, net: 88840 },
-  { month: 'Oct', revenue: 1156780, cogs: 842100, opex: 258900, net: 55780 },
-  { month: 'Nov', revenue: 1089432, cogs: 793100, opex: 254700, net: 41632 },
-  { month: 'Dec', revenue: 944430,  cogs: 687400, opex: 250900, net: 6130  },
-].map(r => ({
-  ...r,
-  gp: r.revenue - r.cogs,
-  gpPct: (r.revenue - r.cogs) / r.revenue * 100,
-  netPct: r.net / r.revenue * 100,
-}));
+function buildMonthlyReportData(data) {
+  if (!data) return { monthlyData: [], totals: { revenue: 0, cogs: 0, gp: 0, opex: 0, net: 0, gpPct: 0, netPct: 0 }, maxNet: 1, peakMonths: new Set() };
+  const monthlyData = data.months.map((m, i) => {
+    const revenue = data.revenue.actual[i];
+    const cogs = data.cogs.actual[i];
+    const opex = data.opex.actual[i];
+    const other = data.other.actual[i];
+    const gp = revenue - cogs;
+    const net = gp - opex + other;
+    return {
+      month: m,
+      revenue,
+      cogs,
+      opex,
+      gp,
+      gpPct: revenue > 0 ? (gp / revenue) * 100 : 0,
+      net,
+      netPct: revenue > 0 ? (net / revenue) * 100 : 0,
+    };
+  }).filter((r) => r.revenue > 0 || r.cogs > 0);
 
-const PEAK_MONTHS = new Set(['May', 'Sep']);
-
-const TOTALS = (() => {
-  const t = MONTHLY_DATA.reduce(
-    (acc, r) => ({
-      revenue: acc.revenue + r.revenue,
-      cogs: acc.cogs + r.cogs,
-      gp: acc.gp + r.gp,
-      opex: acc.opex + r.opex,
-      net: acc.net + r.net,
-    }),
+  const t = monthlyData.reduce(
+    (acc, r) => ({ revenue: acc.revenue + r.revenue, cogs: acc.cogs + r.cogs, gp: acc.gp + r.gp, opex: acc.opex + r.opex, net: acc.net + r.net }),
     { revenue: 0, cogs: 0, gp: 0, opex: 0, net: 0 }
   );
-  return { ...t, gpPct: t.gp / t.revenue * 100, netPct: t.net / t.revenue * 100 };
-})();
+  const totals = { ...t, gpPct: t.revenue > 0 ? (t.gp / t.revenue) * 100 : 0, netPct: t.revenue > 0 ? (t.net / t.revenue) * 100 : 0 };
+  const maxNet = monthlyData.length > 0 ? Math.max(...monthlyData.map((r) => Math.abs(r.net))) : 1;
 
-const MAX_NET = Math.max(...MONTHLY_DATA.map(r => r.net));
+  const peak = monthlyData.length > 0 ? Math.max(...monthlyData.map((r) => r.net)) : 0;
+  const peakMonth = monthlyData.find((r) => r.net === peak);
+  const peakMonths = new Set(peakMonth ? [peakMonth.month] : []);
+
+  return { monthlyData, totals, maxNet, peakMonths };
+}
 
 const netColor = (net) => {
   if (net > 50000) return design.colors.mint;
@@ -2116,29 +2231,36 @@ const MonthlyTH = ({ children, align = 'right' }) => (
   </th>
 );
 
-const MonthlyReport = () => (
+const MonthlyReport = ({ data }) => {
+  const { monthlyData: MONTHLY_DATA, totals: TOTALS, maxNet: MAX_NET, peakMonths: PEAK_MONTHS } = useMemo(() => buildMonthlyReportData(data), [data]);
+
+  const bestMonth = MONTHLY_DATA.length > 0 ? MONTHLY_DATA.reduce((a, b) => a.net > b.net ? a : b) : null;
+  const worstMonth = MONTHLY_DATA.length > 0 ? MONTHLY_DATA.reduce((a, b) => a.net < b.net ? a : b) : null;
+  const avgNet = MONTHLY_DATA.length > 0 ? TOTALS.net / MONTHLY_DATA.length : 0;
+  const profitableCount = MONTHLY_DATA.filter((r) => r.net > 0).length;
+
+  return (
   <section
     id="monthly-report"
     data-section="monthly-report"
     style={{ scrollMarginTop: '80px', paddingTop: '48px' }}
   >
     <SectionHeader
-      eyebrow="Full Year Breakdown"
+      eyebrow="Monthly Breakdown"
       title="Monthly Report"
-      description="Revenue, cost structure, and net profitability across all twelve months of FY 2025."
+      description={data ? `Revenue, cost structure, and net profitability — ${data.year} (${data.actualMonthsCount} months of actuals).` : 'Loading...'}
     />
 
-    {/* KPI Mini Cards */}
     <div style={{
       display: 'grid',
       gridTemplateColumns: 'repeat(4, 1fr)',
       gap: '16px',
       marginBottom: '28px',
     }}>
-      <MiniKPI label="Best Month"     value="$93K"    sub="May"        accent={design.colors.mint}    />
-      <MiniKPI label="Worst Month"    value="$6K"     sub="Dec"        accent={design.colors.coral}   />
-      <MiniKPI label="Avg Net / Mo"   value="$44K"    sub="per month"  accent={design.colors.midTeal} />
-      <MiniKPI label="All Profitable" value="12 / 12" sub="months"     accent={design.colors.teal}    />
+      <MiniKPI label="Best Month"     value={bestMonth ? formatCurrency(bestMonth.net) : '-'} sub={bestMonth?.month || ''}    accent={design.colors.mint}    />
+      <MiniKPI label="Worst Month"    value={worstMonth ? formatCurrency(worstMonth.net) : '-'} sub={worstMonth?.month || ''} accent={design.colors.coral}   />
+      <MiniKPI label="Avg Net / Mo"   value={formatCurrency(avgNet)}    sub="per month"  accent={design.colors.midTeal} />
+      <MiniKPI label="Profitable"     value={`${profitableCount} / ${MONTHLY_DATA.length}`} sub="months"     accent={design.colors.teal}    />
     </div>
 
     {/* P&L Table */}
@@ -2236,7 +2358,7 @@ const MonthlyReport = () => (
             Net Income — Monthly Performance
           </div>
           <div style={{ fontSize: '12px', color: design.colors.mutedText, marginTop: '2px', fontFamily: design.font.family }}>
-            FY 2025 · all values in USD
+            {data ? `${data.year}` : ''} · all values in USD
           </div>
         </div>
         <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -2296,7 +2418,8 @@ const MonthlyReport = () => (
       </div>
     </Card>
   </section>
-);
+  );
+};
 
 /* ==========================================================================
    8. SIDEBAR — from PR #6, NAV_ITEMS updated to include ALL sections
@@ -2311,7 +2434,7 @@ const NAV_ITEMS = [
   { id: 'monthly-report', label: 'Monthly Report'    },
 ];
 
-const Sidebar = ({ activeSection }) => (
+const Sidebar = ({ activeSection, data }) => (
   <aside
     className="cf-sidebar"
     style={{
@@ -2367,7 +2490,7 @@ const Sidebar = ({ activeSection }) => (
         color: design.colors.mutedText,
         marginTop: '3px',
       }}>
-        FY 2025 Dashboard
+        {data ? `${data.year} Dashboard` : 'Dashboard'}
       </div>
     </div>
 
@@ -2426,7 +2549,7 @@ const Sidebar = ({ activeSection }) => (
         color: design.colors.slate,
         lineHeight: 1.6,
       }}>
-        Q1–Q4 2025<br />
+        {data ? `Q1${data.actualMonthsCount > 3 ? `–Q${Math.ceil(data.actualMonthsCount / 3)}` : ''} ${data.year}` : ''}<br />
         YTD Actuals
       </div>
     </div>
@@ -2437,8 +2560,33 @@ const Sidebar = ({ activeSection }) => (
    9. MAIN DASHBOARD — PR #6 layout with sidebar + all sections
    ========================================================================== */
 
+const LoadingScreen = () => (
+  <div style={{
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: '100vh',
+    ...pageBackground,
+    fontFamily: design.font.family,
+  }}>
+    <div style={{ textAlign: 'center' }}>
+      <div style={{
+        width: '48px', height: '48px', borderRadius: '14px',
+        background: `linear-gradient(135deg, ${design.colors.teal}, ${design.colors.midTeal})`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        margin: '0 auto 16px',
+        boxShadow: '0 4px 12px rgba(13,79,79,0.25)',
+      }}>
+        <span style={{ color: '#fff', fontSize: '17px', fontWeight: 800, letterSpacing: '-0.02em' }}>CF</span>
+      </div>
+      <p style={{ color: design.colors.mutedText, fontSize: '14px' }}>Loading financial data...</p>
+    </div>
+  </div>
+);
+
 const FinancialDashboard = () => {
   const [activeSection, setActiveSection] = useState('overview');
+  const { data, loading } = useFinancialData(2026);
 
   useEffect(() => {
     const sections = document.querySelectorAll('[data-section]');
@@ -2455,21 +2603,20 @@ const FinancialDashboard = () => {
 
     sections.forEach((s) => observer.observe(s));
     return () => observer.disconnect();
-  }, []);
+  }, [data]);
+
+  if (loading) return <LoadingScreen />;
+
+  const periodLabel = data
+    ? `${data.year} Q${Math.ceil(data.actualMonthsCount / 3)} YTD`
+    : '';
 
   return (
     <>
-      <link rel="preconnect" href="https://fonts.googleapis.com" />
-      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-      <link
-        rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
-      />
       <style>{`
         *, *::before, *::after { box-sizing: border-box; }
         html { scroll-behavior: smooth; }
         body { margin: 0; }
-        /* Horizontal scroll for any tables added to future sections */
         .cf-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
         .cf-table-wrap table { min-width: 600px; width: 100%; border-collapse: collapse; }
         @media (max-width: 768px) {
@@ -2490,7 +2637,7 @@ const FinancialDashboard = () => {
           color: design.colors.darkText,
         }}
       >
-        <Sidebar activeSection={activeSection} />
+        <Sidebar activeSection={activeSection} data={data} />
 
         <div
           className="cf-content"
@@ -2502,7 +2649,7 @@ const FinancialDashboard = () => {
           }}
         >
           <header style={{ marginBottom: '8px' }}>
-            <Badge color={design.colors.teal}>FY 2025</Badge>
+            <Badge color={design.colors.teal}>{periodLabel}</Badge>
             <h1
               style={{
                 margin: '12px 0 8px',
@@ -2524,16 +2671,16 @@ const FinancialDashboard = () => {
                 color: design.colors.mutedText,
               }}
             >
-              FY 2025 Financial Dashboard
+              {data ? `${data.year} Financial Dashboard` : 'Financial Dashboard'}
             </p>
           </header>
 
-          <OverviewSection />
-          <COGSSection />
-          <PayrollSection />
-          <UtilitiesSection />
-          <ExpenseDetailSection />
-          <MonthlyReport />
+          <OverviewSection data={data} />
+          <COGSSection data={data} />
+          <PayrollSection data={data} />
+          <UtilitiesSection data={data} />
+          <ExpenseDetailSection data={data} />
+          <MonthlyReport data={data} />
         </div>
       </div>
     </>

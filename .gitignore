@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
+*.log
+.DS_Store
+data/2026/2026_YTD_Forecast.xlsx

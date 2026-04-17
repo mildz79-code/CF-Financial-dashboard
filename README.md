@@ -9,20 +9,30 @@ Financial reporting and P&L analysis for **Color Fashion Dye & Finishing**.
 ├── 2026_monthly_budget.xlsx          # Original 2026 budget (Jan baseline populated)
 ├── 2026_monthly_budget_korean.xlsx   # Korean-language parallel version
 ├── prompt_to_recreate_2026_budget.md # Reusable prompt for regenerating the budget
+├── index.html                        # Vite entry HTML
+├── package.json                      # Node dependencies (React, Supabase, Vite)
+├── vite.config.js                    # Vite configuration
+├── .env.example                      # Template for Supabase credentials
 ├── data/
 │   └── 2026/
 │       ├── Jan_PL.csv                # January 2026 QuickBooks P&L export
 │       ├── Feb_PL.csv                # February 2026 QuickBooks P&L export
 │       ├── Mar_PL.csv                # March 2026 QuickBooks P&L export
-│       └── 2026_YTD_Forecast.xlsx    # Q1 actuals + Apr–Dec forecast model
+│       └── 2026_YTD_Forecast.xlsx    # Q1 actuals + Apr–Dec forecast model (generated)
 ├── scripts/
 │   └── build_ytd_forecast.py         # Regenerates 2026_YTD_Forecast.xlsx
+├── src/
+│   ├── main.jsx                      # React entry point
+│   ├── FinancialDashboard.jsx        # Main dashboard component (2026 data-driven)
+│   ├── supabaseClient.js             # Supabase JS client
+│   └── useFinancialData.js           # Data hook (Supabase fetch + fallback)
 ├── supabase/
 │   └── migrations/
 │       ├── 001_create_pl_tables.sql      # pl_line_items + pl_monthly
 │       ├── 002_create_pl_views.sql       # pl_monthly_wide + pl_category_summary
 │       ├── 003_create_storage_bucket.sql # private 'financials' bucket
-│       └── 004_seed_2026_data.sql        # 2026 line items + Q1 actuals + budget
+│       ├── 004_seed_2026_data.sql        # 2026 line items + Q1 actuals + budget
+│       └── 005_seed_forecast.sql         # Apr–Dec forecast rows (blended)
 ├── docs/
 │   └── SCHEMA.md                     # Database schema reference
 ├── .gitignore
@@ -66,6 +76,20 @@ select * from pl_category_summary
 where year = 2026 and source = 'actual'
 order by month;
 ```
+
+## Running the Dashboard
+
+```bash
+npm install
+npm run dev
+```
+
+The dashboard works in two modes:
+
+1. **With Supabase** — Copy `.env.example` to `.env.local` and fill in your Supabase URL and anon key. Data loads live from the `pl_line_items` and `pl_monthly` tables.
+2. **Without Supabase** — If no credentials are set, the dashboard uses built-in fallback data (2026 Q1 actuals from the CSV exports).
+
+To build for production: `npm run build` (outputs to `dist/`).
 
 ## Regenerating the YTD Forecast spreadsheet
 
