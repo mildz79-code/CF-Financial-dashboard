@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useYearSummary } from './hooks/useYearSummary';
 
 /* ==========================================================================
    1. SHARED FOUNDATION — Design Tokens & Global Helpers
@@ -52,6 +53,12 @@ const formatK = (value) => {
   const abs = Math.abs(n);
   const sign = n < 0 ? '-' : '';
   return `${sign}$${Math.round(abs / 1000).toLocaleString()}K`;
+};
+
+const formatCurrencyFull = (value) => {
+  const n = Number(value) || 0;
+  const sign = n < 0 ? '-' : '';
+  return `${sign}$${Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 };
 
 const useInView = (options = { threshold: 0.2, rootMargin: '0px 0px -10% 0px' }) => {
@@ -218,6 +225,208 @@ const SectionHeader = ({ eyebrow, title, description, action, style }) => (
     {action && <div>{action}</div>}
   </div>
 );
+
+const SOURCE_META = {
+  actual: { label: 'Actual', color: design.colors.teal },
+  budget: { label: 'Budget', color: design.colors.midTeal },
+  forecast: { label: 'Forecast', color: design.colors.coral },
+};
+
+const sourceOrder = ['actual', 'budget', 'forecast'];
+
+const SnapshotKpi = ({ label, value, accent }) => (
+  <Card padding="20px">
+    <div
+      style={{
+        fontFamily: design.font.family,
+        fontWeight: design.font.weights.semibold,
+        fontSize: '11px',
+        color: design.colors.mutedText,
+        letterSpacing: '0.08em',
+        textTransform: 'uppercase',
+        marginBottom: '8px',
+      }}
+    >
+      {label}
+    </div>
+    <div
+      style={{
+        fontFamily: design.font.family,
+        fontWeight: design.font.weights.extrabold,
+        fontSize: '28px',
+        lineHeight: 1,
+        color: accent,
+        letterSpacing: '-0.01em',
+      }}
+    >
+      {formatCurrency(value)}
+    </div>
+  </Card>
+);
+
+const Live2026Section = () => {
+  const [source, setSource] = useState('actual');
+  const { loading, error, data } = useYearSummary(2026, source);
+
+  const rows = data?.rows ?? [];
+  const totals = data?.totals ?? {
+    revenue: 0,
+    cogs: 0,
+    opex: 0,
+    other: 0,
+    grossProfit: 0,
+    netIncome: 0,
+  };
+  const hasActivity = rows.some((r) => [r.revenue, r.cogs, r.opex, r.other, r.netIncome].some((v) => Math.abs(v) > 0));
+  const isConfigured = data?.configured !== false;
+
+  return (
+    <section
+      id="live-2026"
+      data-section="live-2026"
+      style={{ scrollMarginTop: '80px', paddingTop: '48px', marginBottom: '56px' }}
+    >
+      <SectionHeader
+        eyebrow="Live Data"
+        title="2026 Snapshot (Supabase)"
+        description="Monthly P&L totals from pl_category_summary by data source. Use this section for current-year operational review."
+        action={
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {sourceOrder.map((key) => {
+              const active = source === key;
+              const meta = SOURCE_META[key];
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setSource(key)}
+                  style={{
+                    border: 'none',
+                    cursor: 'pointer',
+                    borderRadius: design.radius.pill,
+                    padding: '6px 12px',
+                    fontFamily: design.font.family,
+                    fontWeight: design.font.weights.semibold,
+                    fontSize: '12px',
+                    color: active ? '#fff' : meta.color,
+                    backgroundColor: active ? meta.color : `${meta.color}22`,
+                  }}
+                >
+                  {meta.label}
+                </button>
+              );
+            })}
+          </div>
+        }
+      />
+
+      {!isConfigured && (
+        <Card style={{ marginBottom: '16px', borderLeft: `4px solid ${design.colors.coral}` }}>
+          <p
+            style={{
+              margin: 0,
+              fontFamily: design.font.family,
+              color: design.colors.darkText,
+              lineHeight: 1.5,
+            }}
+          >
+            Supabase env vars are not configured. Add <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> in a local
+            <code> .env</code> file to load live data.
+          </p>
+        </Card>
+      )}
+
+      {error && (
+        <Card style={{ marginBottom: '16px', borderLeft: `4px solid ${design.colors.coral}` }}>
+          <p style={{ margin: 0, fontFamily: design.font.family, color: design.colors.darkText }}>
+            Failed to load live data: {error}
+          </p>
+        </Card>
+      )}
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+          gap: '16px',
+          marginBottom: '20px',
+        }}
+      >
+        <SnapshotKpi label="Revenue" value={totals.revenue} accent={design.colors.teal} />
+        <SnapshotKpi label="COGS" value={totals.cogs} accent={design.colors.coral} />
+        <SnapshotKpi label="Gross Profit" value={totals.grossProfit} accent={design.colors.midTeal} />
+        <SnapshotKpi label="OpEx" value={totals.opex} accent={design.colors.slate} />
+        <SnapshotKpi label="Net Income" value={totals.netIncome} accent={totals.netIncome >= 0 ? design.colors.mint : design.colors.coral} />
+      </div>
+
+      <Card padding="0" style={{ overflow: 'hidden' }}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '820px', fontFamily: design.font.family }}>
+            <thead>
+              <tr>
+                {['Month', 'Revenue', 'COGS', 'Gross Profit', 'OpEx', 'Other', 'Net Income'].map((col, idx) => (
+                  <th
+                    key={col}
+                    style={{
+                      padding: '12px 16px',
+                      textAlign: idx === 0 ? 'left' : 'right',
+                      fontSize: '11px',
+                      fontWeight: design.font.weights.semibold,
+                      letterSpacing: '0.07em',
+                      textTransform: 'uppercase',
+                      color: design.colors.mutedText,
+                      borderBottom: `2px solid ${design.colors.cardBorder}`,
+                      backgroundColor: '#F8FAFB',
+                    }}
+                  >
+                    {col}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={7} style={{ padding: '18px 16px', color: design.colors.mutedText }}>
+                    Loading data...
+                  </td>
+                </tr>
+              ) : !hasActivity ? (
+                <tr>
+                  <td colSpan={7} style={{ padding: '18px 16px', color: design.colors.mutedText }}>
+                    No rows found for 2026 {SOURCE_META[source].label.toLowerCase()} yet.
+                  </td>
+                </tr>
+              ) : (
+                rows.map((row, i) => (
+                  <tr key={row.month} style={{ backgroundColor: i % 2 ? 'rgba(13,79,79,0.016)' : '#fff' }}>
+                    <td style={{ padding: '10px 16px', textAlign: 'left', borderBottom: `1px solid ${design.colors.cardBorder}` }}>{row.month}</td>
+                    <td style={{ padding: '10px 16px', textAlign: 'right', borderBottom: `1px solid ${design.colors.cardBorder}` }}>{formatCurrencyFull(row.revenue)}</td>
+                    <td style={{ padding: '10px 16px', textAlign: 'right', borderBottom: `1px solid ${design.colors.cardBorder}` }}>{formatCurrencyFull(row.cogs)}</td>
+                    <td style={{ padding: '10px 16px', textAlign: 'right', borderBottom: `1px solid ${design.colors.cardBorder}` }}>{formatCurrencyFull(row.grossProfit)}</td>
+                    <td style={{ padding: '10px 16px', textAlign: 'right', borderBottom: `1px solid ${design.colors.cardBorder}` }}>{formatCurrencyFull(row.opex)}</td>
+                    <td style={{ padding: '10px 16px', textAlign: 'right', borderBottom: `1px solid ${design.colors.cardBorder}` }}>{formatCurrencyFull(row.other)}</td>
+                    <td
+                      style={{
+                        padding: '10px 16px',
+                        textAlign: 'right',
+                        borderBottom: `1px solid ${design.colors.cardBorder}`,
+                        color: row.netIncome >= 0 ? design.colors.teal : design.colors.coral,
+                        fontWeight: design.font.weights.semibold,
+                      }}
+                    >
+                      {formatCurrencyFull(row.netIncome)}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </section>
+  );
+};
 
 /* ==========================================================================
    2. OVERVIEW SECTION — from PR #5 (claude/add-kpi-cards-overview-BsBQI)
@@ -2303,6 +2512,7 @@ const MonthlyReport = () => (
    ========================================================================== */
 
 const NAV_ITEMS = [
+  { id: 'live-2026',      label: '2026 Snapshot'     },
   { id: 'overview',       label: 'Overview'          },
   { id: 'cogs',           label: 'COGS Details'      },
   { id: 'payroll',        label: 'Payroll Analysis'  },
@@ -2502,7 +2712,7 @@ const FinancialDashboard = () => {
           }}
         >
           <header style={{ marginBottom: '8px' }}>
-            <Badge color={design.colors.teal}>FY 2025</Badge>
+            <Badge color={design.colors.teal}>FY 2026 + FY 2025</Badge>
             <h1
               style={{
                 margin: '12px 0 8px',
@@ -2524,10 +2734,11 @@ const FinancialDashboard = () => {
                 color: design.colors.mutedText,
               }}
             >
-              FY 2025 Financial Dashboard
+              Live 2026 Data + FY 2025 Financial Dashboard
             </p>
           </header>
 
+          <Live2026Section />
           <OverviewSection />
           <COGSSection />
           <PayrollSection />

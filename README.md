@@ -2,6 +2,31 @@
 
 Financial reporting and P&L analysis for **Color Fashion Dye & Finishing**.
 
+## Frontend Dashboard (React + Vite)
+
+The dashboard now runs as a Vite React app and includes:
+
+- Existing FY2025 static design sections (overview, COGS, payroll, utilities, expenses, monthly report)
+- New **2026 Snapshot (Supabase)** section with source toggle (`actual`, `budget`, `forecast`) backed by `pl_category_summary`
+
+### Local run
+
+```bash
+npm install
+npm run dev
+```
+
+### Live Supabase data configuration
+
+Copy `.env.example` to `.env` and set:
+
+```bash
+VITE_SUPABASE_URL=...
+VITE_SUPABASE_ANON_KEY=...
+```
+
+If env vars are missing, the app still loads and shows a guidance message in the 2026 Snapshot section.
+
 ## Structure
 
 ```
@@ -25,7 +50,11 @@ Financial reporting and P&L analysis for **Color Fashion Dye & Finishing**.
 │       └── 004_seed_2026_data.sql        # 2026 line items + Q1 actuals + budget
 ├── docs/
 │   └── SCHEMA.md                     # Database schema reference
+├── .env.example
 ├── .gitignore
+├── index.html
+├── package.json
+├── vite.config.js
 ├── requirements.txt
 └── README.md
 ```
