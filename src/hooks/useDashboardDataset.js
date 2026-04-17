@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fetchYearSummary } from '../lib/financialData';
+import { fetchDashboardDataset } from '../lib/financialData';
 
 const initialState = {
   loading: true,
@@ -7,7 +7,7 @@ const initialState = {
   data: null,
 };
 
-export const useYearSummary = (year = 2026, source = 'actual') => {
+export const useDashboardDataset = (year = 2026) => {
   const [state, setState] = useState(initialState);
 
   useEffect(() => {
@@ -16,14 +16,14 @@ export const useYearSummary = (year = 2026, source = 'actual') => {
     const load = async () => {
       setState({ loading: true, error: null, data: null });
       try {
-        const data = await fetchYearSummary(year, source);
+        const data = await fetchDashboardDataset(year);
         if (!active) return;
         setState({ loading: false, error: null, data });
       } catch (err) {
         if (!active) return;
         setState({
           loading: false,
-          error: err?.message || 'Failed to load year summary.',
+          error: err?.message || 'Failed to load dashboard dataset.',
           data: null,
         });
       }
@@ -34,7 +34,7 @@ export const useYearSummary = (year = 2026, source = 'actual') => {
     return () => {
       active = false;
     };
-  }, [year, source]);
+  }, [year]);
 
   return state;
 };
