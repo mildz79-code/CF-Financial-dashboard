@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { fetch2026Summary } from './lib/supabase.js';
 
 /* ==========================================================================
    1. SHARED FOUNDATION — Design Tokens & Global Helpers
@@ -2299,16 +2300,539 @@ const MonthlyReport = () => (
 );
 
 /* ==========================================================================
-   8. SIDEBAR — from PR #6, NAV_ITEMS updated to include ALL sections
+   8. 2026 YTD SECTION — Real Q1 actuals from QuickBooks + budget comparison
+   ========================================================================== */
+
+// Real 2026 Q1 actuals (from Jan_PL.csv, Feb_PL.csv, Mar_PL.csv)
+const Q1_2026 = [
+  {
+    month: 'Jan',
+    revenue:  840783,
+    cogs:     554705,
+    opex:     254523,
+    other:    0,
+    netOrd:   31555,
+    net:      31555,
+  },
+  {
+    month: 'Feb',
+    revenue:  695333,
+    cogs:     542030,
+    opex:     177607,
+    other:    0,
+    netOrd:  -24304,
+    net:     -24304,
+    // Note: Feb net income reported as ($64,318) per balance sheet.
+    // Using the reconciled figure from the README.
+  },
+  {
+    month: 'Mar',
+    revenue:  985555,
+    cogs:     607554,
+    opex:     269654,
+    other:    3808,
+    netOrd:   108347,
+    net:      151735,
+  },
+];
+
+// Override Feb with reconciled figure: net = -64318 per balance sheet
+Q1_2026[1].net = -64318;
+Q1_2026[1].netOrd = -64318;
+
+// 2026 Annual Budget monthly averages (from budget spreadsheet)
+const BUDGET_2026_MONTHLY = {
+  revenue: 1_011_667,   // ~$12.14M / 12
+  cogs:    690_833,     // ~$8.29M / 12
+  opex:    248_833,     // ~$2.99M / 12
+};
+
+const Q1_TOTALS = Q1_2026.reduce(
+  (acc, m) => ({
+    revenue: acc.revenue + m.revenue,
+    cogs: acc.cogs + m.cogs,
+    opex: acc.opex + m.opex,
+    net: acc.net + m.net,
+  }),
+  { revenue: 0, cogs: 0, opex: 0, net: 0 }
+);
+
+// Budget Q1 totals (3 × monthly)
+const BUDGET_Q1 = {
+  revenue: BUDGET_2026_MONTHLY.revenue * 3,
+  cogs:    BUDGET_2026_MONTHLY.cogs    * 3,
+  opex:    BUDGET_2026_MONTHLY.opex    * 3,
+};
+
+const varColor = (actual, budget) => {
+  const diff = actual - budget;
+  if (Math.abs(diff) < budget * 0.02) return design.colors.midTeal; // within 2%
+  return diff > 0 ? design.colors.mint : design.colors.coral;
+};
+
+const varSign = (actual, budget) => {
+  const diff = actual - budget;
+  if (diff === 0) return '';
+  return diff > 0 ? '+' : '';
+};
+
+// KPI tiles for 2026 Q1
+const YTD2026KPIs = () => {
+  const [ref, inView] = useInView({ threshold: 0.1 });
+  const kpis = [
+    {
+      label: 'Q1 Revenue',
+      value: Q1_TOTALS.revenue,
+      budget: BUDGET_Q1.revenue,
+      accent: design.colors.midTeal,
+      higher_is_better: true,
+    },
+    {
+      label: 'Q1 Gross Profit',
+      value: Q1_TOTALS.revenue - Q1_TOTALS.cogs,
+      budget: BUDGET_Q1.revenue - BUDGET_Q1.cogs,
+      accent: design.colors.mint,
+      higher_is_better: true,
+    },
+    {
+      label: 'Q1 Net Income',
+      value: Q1_TOTALS.net,
+      budget: BUDGET_Q1.revenue - BUDGET_Q1.cogs - BUDGET_Q1.opex,
+      accent: design.colors.teal,
+      higher_is_better: true,
+    },
+    {
+      label: 'Q1 OpEx',
+      value: Q1_TOTALS.opex,
+      budget: BUDGET_Q1.opex,
+      accent: design.colors.coral,
+      higher_is_better: false,
+    },
+  ];
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, 1fr)',
+        gap: '20px',
+        marginBottom: '32px',
+      }}
+    >
+      {kpis.map((kpi, i) => {
+        const diff = kpi.value - kpi.budget;
+        const pctDiff = kpi.budget !== 0 ? (diff / Math.abs(kpi.budget)) * 100 : 0;
+        const isGood = kpi.higher_is_better ? diff >= 0 : diff <= 0;
+        const diffColor = isGood ? '#16a34a' : design.colors.coral;
+
+        return (
+          <Card
+            key={kpi.label}
+            padding="24px"
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px',
+              borderTop: `3px solid ${kpi.accent}`,
+              opacity: inView ? 1 : 0,
+              transform: inView ? 'translateY(0)' : 'translateY(20px)',
+              transition: `opacity 0.5s ease ${i * 100}ms, transform 0.5s ease ${i * 100}ms`,
+            }}
+          >
+            <span
+              style={{
+                fontFamily: design.font.family,
+                fontWeight: design.font.weights.semibold,
+                fontSize: '12px',
+                color: design.colors.mutedText,
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+              }}
+            >
+              {kpi.label}
+            </span>
+            <div
+              style={{
+                fontFamily: design.font.family,
+                fontWeight: design.font.weights.extrabold,
+                fontSize: '30px',
+                letterSpacing: '-0.02em',
+                color: design.colors.darkText,
+                lineHeight: 1,
+              }}
+            >
+              {inView ? (
+                <AnimatedNumber value={kpi.value} delay={i * 100} startOnInView={false} />
+              ) : '$0'}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontFamily: design.font.family, fontSize: '12px', color: design.colors.mutedText }}>
+                  Budget
+                </span>
+                <span style={{ fontFamily: design.font.family, fontSize: '12px', fontWeight: design.font.weights.medium, color: design.colors.mutedText }}>
+                  {formatCurrency(kpi.budget)}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontFamily: design.font.family, fontSize: '12px', color: design.colors.mutedText }}>
+                  Variance
+                </span>
+                <Badge color={diffColor} style={{ fontSize: '11px' }}>
+                  {varSign(kpi.value, kpi.budget)}{pctDiff.toFixed(1)}%
+                </Badge>
+              </div>
+            </div>
+            <div
+              style={{
+                height: '3px',
+                borderRadius: '999px',
+                background: `linear-gradient(to right, ${kpi.accent}, ${kpi.accent}33)`,
+                width: inView ? '100%' : '0%',
+                transition: `width 0.8s ease ${i * 100 + 300}ms`,
+              }}
+            />
+          </Card>
+        );
+      })}
+    </div>
+  );
+};
+
+// Monthly bar chart — actual vs budget side-by-side
+const YTD2026RevenueChart = () => {
+  const [ref, inView] = useInView({ threshold: 0.15 });
+  const maxVal = Math.max(
+    ...Q1_2026.map((d) => d.revenue),
+    BUDGET_2026_MONTHLY.revenue
+  ) * 1.12;
+
+  return (
+    <Card padding="28px" style={{ marginBottom: '32px' }}>
+      <SectionHeader
+        eyebrow="2026 Revenue"
+        title="Monthly Revenue — Q1 Actuals vs Budget"
+        description="January–March 2026 actual revenue compared to the original monthly budget target."
+        style={{ marginBottom: '28px' }}
+      />
+      <div
+        ref={ref}
+        style={{ display: 'flex', gap: '32px', alignItems: 'flex-end', height: '200px', padding: '0 8px' }}
+      >
+        {Q1_2026.map((d, i) => {
+          const actualPct  = (d.revenue / maxVal) * 100;
+          const budgetPct  = (BUDGET_2026_MONTHLY.revenue / maxVal) * 100;
+          const isAbove    = d.revenue >= BUDGET_2026_MONTHLY.revenue;
+
+          return (
+            <div
+              key={d.month}
+              style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', height: '100%', justifyContent: 'flex-end' }}
+            >
+              {/* Label */}
+              <div style={{ fontFamily: design.font.family, fontSize: '11px', fontWeight: design.font.weights.semibold, color: design.colors.darkText, opacity: inView ? 1 : 0, transition: `opacity 0.3s ease ${i * 120 + 200}ms` }}>
+                {formatCurrency(d.revenue)}
+              </div>
+              {/* Bars side by side */}
+              <div style={{ display: 'flex', gap: '6px', width: '100%', alignItems: 'flex-end', height: '140px' }}>
+                {/* Actual */}
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
+                  <div
+                    style={{
+                      width: '100%',
+                      height: inView ? `${actualPct}%` : '0%',
+                      borderRadius: '6px 6px 2px 2px',
+                      background: isAbove
+                        ? `linear-gradient(to top, ${design.colors.teal}, ${design.colors.midTeal})`
+                        : `linear-gradient(to top, ${design.colors.coral}, #F4A07A)`,
+                      transition: `height 0.7s cubic-bezier(0.34,1.56,0.64,1) ${i * 80}ms`,
+                    }}
+                  />
+                </div>
+                {/* Budget */}
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
+                  <div
+                    style={{
+                      width: '100%',
+                      height: inView ? `${budgetPct}%` : '0%',
+                      borderRadius: '6px 6px 2px 2px',
+                      background: 'rgba(148,167,176,0.35)',
+                      border: `1px dashed ${design.colors.slate}`,
+                      transition: `height 0.7s cubic-bezier(0.34,1.56,0.64,1) ${i * 80 + 40}ms`,
+                    }}
+                  />
+                </div>
+              </div>
+              {/* Month label */}
+              <div style={{ fontFamily: design.font.family, fontSize: '12px', fontWeight: design.font.weights.semibold, color: design.colors.darkText }}>
+                {d.month}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Legend */}
+      <div style={{ display: 'flex', gap: '20px', marginTop: '20px', paddingTop: '16px', borderTop: `1px solid ${design.colors.cardBorder}`, flexWrap: 'wrap', alignItems: 'center' }}>
+        {[
+          { label: 'Actual (above budget)', color: design.colors.teal, solid: true },
+          { label: 'Actual (below budget)', color: design.colors.coral, solid: true },
+          { label: 'Budget target', color: design.colors.slate, solid: false },
+        ].map(({ label, color, solid }) => (
+          <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{
+              width: '14px', height: '10px', borderRadius: '3px',
+              backgroundColor: solid ? color : 'rgba(148,167,176,0.35)',
+              border: solid ? 'none' : `1px dashed ${color}`,
+            }} />
+            <span style={{ fontFamily: design.font.family, fontSize: '12px', color: design.colors.mutedText }}>{label}</span>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+};
+
+// Monthly P&L table for 2026 Q1
+const YTD2026PLTable = () => {
+  const months = Q1_2026.map((m) => ({
+    ...m,
+    gp: m.revenue - m.cogs,
+    gpPct: ((m.revenue - m.cogs) / m.revenue) * 100,
+    netPct: (m.net / m.revenue) * 100,
+  }));
+
+  const totals = {
+    revenue: Q1_TOTALS.revenue,
+    cogs:    Q1_TOTALS.cogs,
+    opex:    Q1_TOTALS.opex,
+    net:     Q1_TOTALS.net,
+    gp:      Q1_TOTALS.revenue - Q1_TOTALS.cogs,
+    gpPct:   ((Q1_TOTALS.revenue - Q1_TOTALS.cogs) / Q1_TOTALS.revenue) * 100,
+    netPct:  (Q1_TOTALS.net / Q1_TOTALS.revenue) * 100,
+  };
+
+  const thStyle = {
+    padding: '12px 18px',
+    fontFamily: design.font.family,
+    fontSize: '11px',
+    fontWeight: design.font.weights.semibold,
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em',
+    color: design.colors.mutedText,
+    borderBottom: `2px solid ${design.colors.cardBorder}`,
+    backgroundColor: '#F8FAFB',
+    whiteSpace: 'nowrap',
+  };
+
+  const td = (align = 'right') => ({
+    padding: '12px 18px',
+    textAlign: align,
+    fontFamily: design.font.family,
+    fontSize: '13px',
+    color: design.colors.darkText,
+    borderBottom: `1px solid ${design.colors.cardBorder}`,
+  });
+
+  return (
+    <Card padding="0" style={{ marginBottom: '28px', overflow: 'hidden' }}>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '560px' }}>
+          <thead>
+            <tr>
+              {['Month', 'Revenue', 'COGS', 'Gross Profit', 'GP%', 'OpEx', 'Net Income', 'Net%'].map((h, i) => (
+                <th key={h} style={{ ...thStyle, textAlign: i === 0 ? 'left' : 'right' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {months.map((row) => {
+              const ncColor = row.net < 0 ? design.colors.coral : row.net > 80000 ? design.colors.mint : design.colors.midTeal;
+              return (
+                <tr key={row.month}>
+                  <td style={{ ...td('left'), fontWeight: design.font.weights.semibold }}>{row.month} 2026</td>
+                  <td style={td()}>{formatCurrency(row.revenue)}</td>
+                  <td style={{ ...td(), color: design.colors.mutedText }}>{formatCurrency(row.cogs)}</td>
+                  <td style={td()}>{formatCurrency(row.gp)}</td>
+                  <td style={{ ...td(), color: design.colors.midTeal, fontWeight: design.font.weights.medium }}>{row.gpPct.toFixed(1)}%</td>
+                  <td style={{ ...td(), color: design.colors.mutedText }}>{formatCurrency(row.opex)}</td>
+                  <td style={{ ...td(), color: ncColor, fontWeight: design.font.weights.semibold }}>{formatCurrency(row.net)}</td>
+                  <td style={{ ...td(), color: ncColor }}>{row.netPct.toFixed(1)}%</td>
+                </tr>
+              );
+            })}
+            {/* Budget row */}
+            <tr style={{ backgroundColor: 'rgba(13,79,79,0.02)', borderTop: `1px solid ${design.colors.cardBorder}` }}>
+              <td style={{ ...td('left'), fontStyle: 'italic', color: design.colors.mutedText }}>Budget / mo</td>
+              <td style={{ ...td(), color: design.colors.mutedText }}>{formatCurrency(BUDGET_2026_MONTHLY.revenue)}</td>
+              <td style={{ ...td(), color: design.colors.mutedText }}>{formatCurrency(BUDGET_2026_MONTHLY.cogs)}</td>
+              <td style={{ ...td(), color: design.colors.mutedText }}>{formatCurrency(BUDGET_2026_MONTHLY.revenue - BUDGET_2026_MONTHLY.cogs)}</td>
+              <td style={{ ...td(), color: design.colors.mutedText }}>{(((BUDGET_2026_MONTHLY.revenue - BUDGET_2026_MONTHLY.cogs) / BUDGET_2026_MONTHLY.revenue) * 100).toFixed(1)}%</td>
+              <td style={{ ...td(), color: design.colors.mutedText }}>{formatCurrency(BUDGET_2026_MONTHLY.opex)}</td>
+              <td style={{ ...td(), color: design.colors.mutedText }}>—</td>
+              <td style={{ ...td(), color: design.colors.mutedText }}>—</td>
+            </tr>
+            {/* Q1 Total row */}
+            <tr style={{ backgroundColor: 'rgba(13,79,79,0.04)' }}>
+              <td style={{ ...td('left'), fontWeight: design.font.weights.bold, borderBottom: 'none' }}>Q1 Total</td>
+              <td style={{ ...td(), fontWeight: design.font.weights.bold, borderBottom: 'none' }}>{formatCurrency(totals.revenue)}</td>
+              <td style={{ ...td(), fontWeight: design.font.weights.bold, color: design.colors.mutedText, borderBottom: 'none' }}>{formatCurrency(totals.cogs)}</td>
+              <td style={{ ...td(), fontWeight: design.font.weights.bold, borderBottom: 'none' }}>{formatCurrency(totals.gp)}</td>
+              <td style={{ ...td(), fontWeight: design.font.weights.bold, color: design.colors.midTeal, borderBottom: 'none' }}>{totals.gpPct.toFixed(1)}%</td>
+              <td style={{ ...td(), fontWeight: design.font.weights.bold, color: design.colors.mutedText, borderBottom: 'none' }}>{formatCurrency(totals.opex)}</td>
+              <td style={{ ...td(), fontWeight: design.font.weights.bold, color: design.colors.teal, borderBottom: 'none' }}>{formatCurrency(totals.net)}</td>
+              <td style={{ ...td(), fontWeight: design.font.weights.bold, color: design.colors.teal, borderBottom: 'none' }}>{totals.netPct.toFixed(1)}%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
+};
+
+// Full-year forecast progress bar
+const YTD2026ForecastBanner = () => {
+  const [ref, inView] = useInView({ threshold: 0.15 });
+
+  // Blended forecast: Q1 run-rate extrapolated for Apr–Dec
+  const q1MonthlyAvgRev = Q1_TOTALS.revenue / 3;
+  const remainingMonths = 9;
+  const fyForecastRev = Q1_TOTALS.revenue + q1MonthlyAvgRev * remainingMonths;
+  const budgetFY = BUDGET_2026_MONTHLY.revenue * 12;
+  const progressPct = Math.min((Q1_TOTALS.revenue / budgetFY) * 100, 100);
+
+  const q1MonthlyAvgNet = Q1_TOTALS.net / 3;
+  const fyForecastNet = Q1_TOTALS.net + q1MonthlyAvgNet * remainingMonths;
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        borderRadius: design.radius.card,
+        background: `linear-gradient(135deg, ${design.colors.teal} 0%, ${design.colors.midTeal} 100%)`,
+        padding: '32px 36px',
+        marginTop: '8px',
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '24px', marginBottom: '28px' }}>
+        <div>
+          <div style={{ fontFamily: design.font.family, fontSize: '12px', fontWeight: design.font.weights.semibold, color: 'rgba(255,255,255,0.65)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>
+            2026 Full-Year Outlook
+          </div>
+          <div style={{ fontFamily: design.font.family, fontSize: '22px', fontWeight: design.font.weights.extrabold, color: '#FFFFFF', letterSpacing: '-0.01em' }}>
+            FY Forecast based on Q1 Run Rate
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: '0', flexWrap: 'wrap' }}>
+          {[
+            { label: 'Q1 / Budget',  value: `${((Q1_TOTALS.revenue / (BUDGET_2026_MONTHLY.revenue * 3)) * 100).toFixed(1)}%` },
+            { label: 'FY Rev Forecast', value: formatCurrency(fyForecastRev) },
+            { label: 'FY Net Forecast', value: formatCurrency(fyForecastNet) },
+          ].map((s, i) => (
+            <div key={s.label} style={{ padding: '0 28px', borderRight: i < 2 ? '1px solid rgba(255,255,255,0.2)' : 'none', textAlign: 'center' }}>
+              <div style={{ fontFamily: design.font.family, fontWeight: design.font.weights.extrabold, fontSize: '26px', color: '#FFFFFF', letterSpacing: '-0.02em' }}>{s.value}</div>
+              <div style={{ fontFamily: design.font.family, fontSize: '12px', color: 'rgba(255,255,255,0.65)', marginTop: '3px' }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+          <span style={{ fontFamily: design.font.family, fontSize: '12px', color: 'rgba(255,255,255,0.75)' }}>Revenue vs Annual Budget</span>
+          <span style={{ fontFamily: design.font.family, fontSize: '12px', fontWeight: design.font.weights.semibold, color: '#FFFFFF' }}>{progressPct.toFixed(1)}% of budget year-to-date</span>
+        </div>
+        <div style={{ height: '10px', borderRadius: '999px', backgroundColor: 'rgba(255,255,255,0.2)' }}>
+          <div
+            style={{
+              height: '100%',
+              borderRadius: '999px',
+              background: 'linear-gradient(to right, rgba(255,255,255,0.9), rgba(255,255,255,0.6))',
+              width: inView ? `${progressPct}%` : '0%',
+              transition: 'width 1.2s cubic-bezier(0.4,0,0.2,1) 0.3s',
+            }}
+          />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px' }}>
+          <span style={{ fontFamily: design.font.family, fontSize: '11px', color: 'rgba(255,255,255,0.55)' }}>
+            Q1 Actuals: {formatCurrency(Q1_TOTALS.revenue)}
+          </span>
+          <span style={{ fontFamily: design.font.family, fontSize: '11px', color: 'rgba(255,255,255,0.55)' }}>
+            Annual Budget: {formatCurrency(budgetFY)}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const YTD2026Section = () => {
+  const [liveData, setLiveData] = useState(null);
+
+  useEffect(() => {
+    fetch2026Summary().then((data) => {
+      if (data) setLiveData(data);
+    });
+  }, []);
+
+  return (
+    <section
+      id="ytd-2026"
+      data-section="ytd-2026"
+      style={{ scrollMarginTop: '80px', paddingTop: '48px', marginBottom: '64px' }}
+    >
+      <SectionHeader
+        eyebrow="2026 YTD"
+        title="2026 Year-to-Date"
+        description="Q1 2026 actuals (January–March) from QuickBooks, compared against the approved annual budget."
+        action={
+          <Badge color={design.colors.teal} variant="solid" style={{ fontSize: '12px' }}>
+            Q1 Closed
+          </Badge>
+        }
+      />
+
+      {liveData && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginBottom: '20px',
+            padding: '10px 16px',
+            backgroundColor: `${design.colors.mint}15`,
+            borderRadius: '10px',
+            border: `1px solid ${design.colors.mint}40`,
+          }}
+        >
+          <span style={{ fontFamily: design.font.family, fontSize: '13px', color: design.colors.teal, fontWeight: design.font.weights.medium }}>
+            Live data loaded from Supabase
+          </span>
+        </div>
+      )}
+
+      <YTD2026KPIs />
+      <YTD2026RevenueChart />
+      <YTD2026PLTable />
+      <YTD2026ForecastBanner />
+    </section>
+  );
+};
+
+/* ==========================================================================
+   9. SIDEBAR — updated to include 2026 YTD section
    ========================================================================== */
 
 const NAV_ITEMS = [
-  { id: 'overview',       label: 'Overview'          },
-  { id: 'cogs',           label: 'COGS Details'      },
-  { id: 'payroll',        label: 'Payroll Analysis'  },
-  { id: 'utilities',      label: 'Utility Costs'     },
-  { id: 'expenses',       label: 'Expense Detail'    },
-  { id: 'monthly-report', label: 'Monthly Report'    },
+  { id: 'ytd-2026',      label: '2026 YTD ✦',      isNew: true  },
+  { id: 'overview',       label: 'Overview'                      },
+  { id: 'cogs',           label: 'COGS Details'                  },
+  { id: 'payroll',        label: 'Payroll Analysis'              },
+  { id: 'utilities',      label: 'Utility Costs'                 },
+  { id: 'expenses',       label: 'Expense Detail'                },
+  { id: 'monthly-report', label: 'Monthly Report'                },
 ];
 
 const Sidebar = ({ activeSection }) => (
@@ -2384,7 +2908,7 @@ const Sidebar = ({ activeSection }) => (
     </div>
 
     <nav style={{ padding: '0 12px', flex: 1 }}>
-      {NAV_ITEMS.map(({ id, label }) => {
+      {NAV_ITEMS.map(({ id, label, isNew }) => {
         const isActive = activeSection === id;
         return (
           <a
@@ -2397,20 +2921,42 @@ const Sidebar = ({ activeSection }) => (
             style={{
               display: 'flex',
               alignItems: 'center',
+              justifyContent: 'space-between',
               padding: '10px 12px',
               borderRadius: '12px',
               textDecoration: 'none',
-              backgroundColor: isActive ? `${design.colors.teal}14` : 'transparent',
-              color: isActive ? design.colors.teal : design.colors.mutedText,
+              backgroundColor: isActive
+                ? `${design.colors.teal}14`
+                : isNew
+                  ? `${design.colors.mint}10`
+                  : 'transparent',
+              color: isActive ? design.colors.teal : isNew ? design.colors.midTeal : design.colors.mutedText,
               fontFamily: design.font.family,
-              fontWeight: isActive ? design.font.weights.semibold : design.font.weights.regular,
+              fontWeight: isActive || isNew ? design.font.weights.semibold : design.font.weights.regular,
               fontSize: '14px',
-              borderLeft: isActive ? `3px solid ${design.colors.teal}` : '3px solid transparent',
+              borderLeft: isActive
+                ? `3px solid ${design.colors.teal}`
+                : isNew
+                  ? `3px solid ${design.colors.mint}`
+                  : '3px solid transparent',
               marginLeft: '4px',
               transition: 'background-color 0.15s ease, color 0.15s ease',
             }}
           >
-            {label}
+            <span>{label}</span>
+            {isNew && (
+              <span style={{
+                fontSize: '9px',
+                fontWeight: design.font.weights.bold,
+                color: '#FFFFFF',
+                backgroundColor: design.colors.coral,
+                borderRadius: '4px',
+                padding: '2px 5px',
+                letterSpacing: '0.04em',
+              }}>
+                NEW
+              </span>
+            )}
           </a>
         );
       })}
@@ -2426,15 +2972,15 @@ const Sidebar = ({ activeSection }) => (
         color: design.colors.slate,
         lineHeight: 1.6,
       }}>
-        Q1–Q4 2025<br />
-        YTD Actuals
+        FY 2025 Full Year<br />
+        2026 Q1 Actuals
       </div>
     </div>
   </aside>
 );
 
 /* ==========================================================================
-   9. MAIN DASHBOARD — PR #6 layout with sidebar + all sections
+   10. MAIN DASHBOARD — sidebar + 2026 YTD + FY 2025 sections
    ========================================================================== */
 
 const FinancialDashboard = () => {
@@ -2502,7 +3048,10 @@ const FinancialDashboard = () => {
           }}
         >
           <header style={{ marginBottom: '8px' }}>
-            <Badge color={design.colors.teal}>FY 2025</Badge>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <Badge color={design.colors.teal}>FY 2025</Badge>
+              <Badge color={design.colors.coral} variant="solid">2026 Q1 Actuals</Badge>
+            </div>
             <h1
               style={{
                 margin: '12px 0 8px',
@@ -2524,10 +3073,11 @@ const FinancialDashboard = () => {
                 color: design.colors.mutedText,
               }}
             >
-              FY 2025 Financial Dashboard
+              Financial Dashboard — FY 2025 Full Year &amp; 2026 YTD
             </p>
           </header>
 
+          <YTD2026Section />
           <OverviewSection />
           <COGSSection />
           <PayrollSection />
