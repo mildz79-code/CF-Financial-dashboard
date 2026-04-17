@@ -1,0 +1,47 @@
+{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
+      }
+    },
+    "metabase": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@cognitionai/metabase-mcp-server"
+      ],
+      "env": {
+        "METABASE_URL": "${METABASE_URL}",
+        "METABASE_API_KEY": "${METABASE_API_KEY}"
+      }
+    },
+    "supabase-colorfashion": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@supabase/mcp-server-supabase@latest",
+        "--project-ref=cgsmzkafagnmsuzzkfnv"
+      ],
+      "env": {
+        "SUPABASE_ACCESS_TOKEN": "${SUPABASE_ACCESS_TOKEN_COLORFASHION}"
+      }
+    },
+    "supabase-onetextile": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@supabase/mcp-server-supabase@latest",
+        "--project-ref=mtxokbgpmkggolyfeehz"
+      ],
+      "env": {
+        "SUPABASE_ACCESS_TOKEN": "${SUPABASE_ACCESS_TOKEN_ONETEXTILE}"
+      }
+    }
+  }
+}
