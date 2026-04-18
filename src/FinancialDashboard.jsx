@@ -25,6 +25,7 @@ const formatCurrencyFull = (value) => {
 };
 
 const pct = (num, den) => (den ? (num / den) * 100 : 0);
+const sumYear = (items) => items.reduce((acc, item) => acc + item.total, 0);
 
 const defaultRows = monthLabels.map((month) => ({
   month,
