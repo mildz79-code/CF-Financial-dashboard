@@ -922,26 +922,21 @@ function FinancialDashboard() {
             }}
           >
             <div>
-              <h1 style={{ margin: 0, fontSize: 'clamp(26px, 4vw, 40px)', fontWeight: 800, lineHeight: 1.1 }}>
+              <h1
+                style={{
+                  margin: 0,
+                  fontSize: 'clamp(22px, 3.2vw, 36px)',
+                  fontWeight: 800,
+                  lineHeight: 1.2,
+                  maxWidth: 900,
+                }}
+              >
                 <span style={{ color: C.teal }}>Color Fashion</span>{' '}
-                <span style={{ color: C.coral }}>Dye &amp; Finishing</span>
+                <span style={{ color: C.coral }}>Dye &amp; Finishing</span>{' '}
+                <span style={{ color: C.mutedText, fontWeight: 700 }}>—</span>{' '}
+                <span style={{ color: C.teal }}>FY 2025</span>{' '}
+                <span style={{ color: C.darkText }}>Financial Dashboard</span>
               </h1>
-              <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-                <span
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 700,
-                    letterSpacing: '0.08em',
-                    padding: '6px 12px',
-                    borderRadius: 999,
-                    background: C.teal,
-                    color: '#fff',
-                  }}
-                >
-                  FY 2025
-                </span>
-                <span style={{ color: C.mutedText, fontSize: 14 }}>Financial Dashboard</span>
-              </div>
             </div>
             <Card style={{ padding: '12px 18px', minWidth: 200 }}>
               <div style={{ fontSize: 12, color: C.mutedText, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
