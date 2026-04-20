@@ -1,4 +1,17 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+  PieChart,
+  Pie,
+  Cell,
+  CartesianGrid,
+} from 'recharts';
 
 const COLORS = {
   teal: '#0D4F4F',
@@ -94,6 +107,88 @@ const totals = {
 };
 const gross = totals.revenue - totals.cogs;
 
+const ANNUAL_REVENUE_DISPLAY = 13280000;
+
+const monthlyRevenueChartData = months.map((m) => ({
+  month: m.month,
+  revenue: m.revenue,
+  peak: m.month === 'May' || m.month === 'Sep',
+}));
+
+const utilitiesStackData = months.map((m) => ({
+  month: m.month,
+  Gas: m.gas,
+  Electricity: m.elec,
+  Water: m.water,
+  Wastewater: m.waste,
+}));
+
+const top5ExpenseChartData = [
+  { name: 'Rent', value: 1052000 },
+  { name: 'Payroll Admin', value: 845000 },
+  { name: 'Rent Mgmt', value: 262000 },
+  { name: 'Repairs Equipment', value: 245000 },
+  { name: 'Interest', value: 197000 },
+];
+
+const payrollChartData = payrollBars.map(([name, annual, avg]) => ({
+  name,
+  annual,
+  avg,
+}));
+
+/** Indexed YoY (2024 = 100) so one axis reads cleanly; tooltips show actuals. */
+const yoyChartData = [
+  {
+    metric: 'Revenue',
+    y2024: 100,
+    y2025: 107.3,
+    tip2024: '$12.38M',
+    tip2025: '$13.28M',
+  },
+  {
+    metric: 'Net Income',
+    y2024: 100,
+    y2025: 184.2,
+    tip2024: '$284K',
+    tip2025: '$523K',
+  },
+  {
+    metric: 'Gross Margin',
+    y2024: 100,
+    y2025: 118.2,
+    tip2024: '23.0%',
+    tip2025: '27.2%',
+  },
+  {
+    metric: 'Net Margin',
+    y2024: 100,
+    y2025: 169.6,
+    tip2024: '2.3%',
+    tip2025: '3.9%',
+  },
+];
+
+const netIncomeBarData = months.map((m) => ({
+  month: m.month,
+  net: m.net,
+  fill: m.net > 50000 ? COLORS.mint : m.net < 20000 ? COLORS.coral : COLORS.teal,
+}));
+
+const cogsSummaryRows = [
+  { label: 'Labor', amount: 4120000, pct: '42.6%' },
+  { label: 'Materials', amount: 2510000, pct: '25.9%' },
+  { label: 'Utilities', amount: 2560000, pct: '26.5%' },
+  { label: 'Other', amount: 480000, pct: '5.0%' },
+];
+
+const opexSummaryRows = [
+  { label: 'Payroll & benefits', amount: 1099000, pct: '8.3%' },
+  { label: 'Rent & occupancy', amount: 1314000, pct: '9.9%' },
+  { label: 'Utilities (OpEx alloc.)', amount: 0, pct: '—' },
+  { label: 'All other OpEx', amount: totals.opex - 1099000 - 1314000, pct: `${((totals.opex - 1099000 - 1314000) / ANNUAL_REVENUE_DISPLAY * 100).toFixed(1)}%` },
+];
+
 const formatCurrency = (v) => {
   const abs = Math.abs(v);
   if (abs >= 1000000) return `$${(v / 1000000).toFixed(2)}M`;
@@ -102,6 +197,9 @@ const formatCurrency = (v) => {
 };
 const formatMoney = (v) => `$${Math.round(v).toLocaleString()}`;
 const pct = (v, d) => `${((v / d) * 100).toFixed(1)}%`;
+
+/** Recharts tooltip: dollar values as $XK */
+const tooltipCurrencyK = (v) => `$${(Number(v) / 1000).toFixed(0)}K`;
 
 const useInView = (threshold = 0.25) => {
   const ref = useRef(null);
@@ -154,22 +252,26 @@ const badge = (bg) => ({
   fontSize: 12,
 });
 
+const axisTick = { fill: COLORS.muted, fontSize: 11 };
+
 const FinancialDashboard = () => {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState('overview');
-  const [hoverSlice, setHoverSlice] = useState(-1);
   const sectionRefs = useRef({});
   const [heroRef, heroInView] = useInView(0.2);
-  const [revRef, revInView] = useInView(0.3);
-  const [utilRef, utilInView] = useInView(0.3);
+  const [revRef, revInView] = useInView(0.25);
+  const [donutRef, donutInView] = useInView(0.25);
+  const [yoyRef, yoyInView] = useInView(0.25);
+  const [utilRef, utilInView] = useInView(0.25);
+  const [netBarRef, netBarInView] = useInView(0.25);
+  const [expBarRef, expBarInView] = useInView(0.25);
+  const [payBarRef, payBarInView] = useInView(0.25);
 
   const animatedRevenue = useCountUp(totals.revenue, heroInView);
   const animatedGross = useCountUp(gross, heroInView);
   const animatedNet = useCountUp(totals.net, heroInView);
   const animatedCogs = useCountUp(totals.cogs, heroInView);
 
-  const bestMonth = months.reduce((a, b) => (a.net > b.net ? a : b));
-  const worstMonth = months.reduce((a, b) => (a.net < b.net ? a : b));
   const avgRevenue = totals.revenue / 12;
   const peakRevenue = Math.max(...months.map((m) => m.revenue));
   const lowRevenue = Math.min(...months.map((m) => m.revenue));
@@ -193,25 +295,6 @@ const FinancialDashboard = () => {
     setOpen(false);
   };
 
-  const donutPaths = useMemo(() => {
-    let start = -90;
-    return expenseAllocation.map((slice, idx) => {
-      const angle = (slice.value / 100) * 360;
-      const end = start + angle;
-      const radius = hoverSlice === idx ? 105 : 98;
-      const inner = 60;
-      const polar = (r, a) => ({ x: 150 + r * Math.cos((a * Math.PI) / 180), y: 150 + r * Math.sin((a * Math.PI) / 180) });
-      const a0 = polar(radius, start);
-      const a1 = polar(radius, end);
-      const i0 = polar(inner, end);
-      const i1 = polar(inner, start);
-      const large = angle > 180 ? 1 : 0;
-      const d = `M ${a0.x} ${a0.y} A ${radius} ${radius} 0 ${large} 1 ${a1.x} ${a1.y} L ${i0.x} ${i0.y} A ${inner} ${inner} 0 ${large} 0 ${i1.x} ${i1.y} Z`;
-      start = end;
-      return { ...slice, d };
-    });
-  }, [hoverSlice]);
-
   return (
     <>
       <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -222,11 +305,12 @@ const FinancialDashboard = () => {
         body{font-family:Outfit,system-ui,sans-serif;background:${COLORS.bg};color:${COLORS.dark}}
         .wrap{min-height:100vh;background-image:linear-gradient(to right,rgba(13,79,79,.03) 1px,transparent 1px),linear-gradient(to bottom,rgba(13,79,79,.03) 1px,transparent 1px);background-size:48px 48px}
         .tbl{width:100%;border-collapse:collapse;min-width:760px}.tbl th{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:${COLORS.muted};padding:10px 12px;border-bottom:2px solid ${COLORS.border};text-align:right}.tbl th:first-child,.tbl td:first-child{text-align:left}.tbl td{padding:10px 12px;border-bottom:1px solid ${COLORS.border};text-align:right}
+        .recharts-default-tooltip{border-radius:12px!important;border:1px solid ${COLORS.border}!important;box-shadow:0 2px 8px rgba(13,79,79,0.08)!important}
         @media (max-width:900px){.main{padding:88px 14px 30px !important}}
       `}</style>
       <div className="wrap">
-        <button onClick={() => setOpen((v) => !v)} style={{ position: 'fixed', left: 14, top: 14, zIndex: 60, width: 44, height: 44, borderRadius: 12, border: 'none', background: COLORS.teal, color: '#fff', fontSize: 20, cursor: 'pointer' }}>☰</button>
-        {open ? <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(10,22,40,0.3)', backdropFilter: 'blur(3px)', zIndex: 40 }} /> : null}
+        <button type="button" onClick={() => setOpen((v) => !v)} style={{ position: 'fixed', left: 14, top: 14, zIndex: 60, width: 44, height: 44, borderRadius: 12, border: 'none', background: COLORS.teal, color: '#fff', fontSize: 20, cursor: 'pointer' }}>☰</button>
+        {open ? <div role="presentation" onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(10,22,40,0.3)', backdropFilter: 'blur(3px)', zIndex: 40 }} /> : null}
         <aside style={{ position: 'fixed', left: open ? 0 : -280, top: 0, width: 260, height: '100vh', background: '#fff', zIndex: 50, transition: 'left .28s ease', padding: 18, borderRight: `1px solid ${COLORS.border}` }}>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 14 }}>
             <div style={{ width: 50, height: 50, borderRadius: 12, display: 'grid', placeItems: 'center', color: '#fff', fontWeight: 800, background: 'linear-gradient(145deg,#0D4F4F,#1A8A8A)' }}>CF</div>
@@ -239,7 +323,7 @@ const FinancialDashboard = () => {
           <div style={{ fontSize: 11, letterSpacing: '.12em', color: COLORS.muted, marginBottom: 8 }}>SECTIONS</div>
           <div style={{ display: 'grid', gap: 8 }}>
             {navItems.map(([id, label, icon]) => (
-              <button key={id} onClick={() => scrollTo(id)} style={{ border: 'none', borderRadius: 12, textAlign: 'left', cursor: 'pointer', padding: '10px 12px', background: active === id ? COLORS.teal : '#fff', color: active === id ? '#fff' : COLORS.dark, display: 'flex', alignItems: 'center', gap: 10, fontWeight: 600 }}>
+              <button key={id} type="button" onClick={() => scrollTo(id)} style={{ border: 'none', borderRadius: 12, textAlign: 'left', cursor: 'pointer', padding: '10px 12px', background: active === id ? COLORS.teal : '#fff', color: active === id ? '#fff' : COLORS.dark, display: 'flex', alignItems: 'center', gap: 10, fontWeight: 600 }}>
                 <span>{icon}</span>{label}
               </button>
             ))}
@@ -260,36 +344,175 @@ const FinancialDashboard = () => {
           <section id="overview" ref={(el) => { sectionRefs.current.overview = el; }} style={{ marginBottom: 34, scrollMarginTop: 80 }}>
             <SectionTitle title="1. Overview" subtitle="Executive KPI summary, revenue momentum, expense allocation, and YoY growth." />
             <div ref={heroRef} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 12 }}>
-              {[['Revenue', animatedRevenue, '+7.3% YoY', COLORS.teal], ['Gross Profit', animatedGross, '27.2%', COLORS.mid], ['Net Income', animatedNet, '3.9%', COLORS.mint], ['COGS', animatedCogs, '72.8%', COLORS.coral]].map(([k, v, sub, c]) => <div key={k} style={{ ...cardStyle, padding: 14 }}><div style={{ color: COLORS.muted, textTransform: 'uppercase', fontSize: 11 }}>{k}</div><div style={{ fontSize: 30, fontWeight: 800, color: c }}>{formatCurrency(v)}</div><span style={badge(c)}>{sub}</span></div>)}
+              {[['Revenue', animatedRevenue, '+7.3% YoY', COLORS.teal], ['Gross Profit', animatedGross, '27.2%', COLORS.mid], ['Net Income', animatedNet, '3.9%', COLORS.mint], ['COGS', animatedCogs, '72.8%', COLORS.coral]].map(([k, v, sub, c]) => (
+                <div key={k} style={{ ...cardStyle, padding: 14 }}>
+                  <div style={{ color: COLORS.muted, textTransform: 'uppercase', fontSize: 11 }}>{k}</div>
+                  <div style={{ fontSize: 30, fontWeight: 800, color: c }}>{formatCurrency(v)}</div>
+                  <span style={badge(c)}>{sub}</span>
+                </div>
+              ))}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 14, marginTop: 14 }}>
-              <div style={{ ...cardStyle, padding: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(320px,1fr))', gap: 14, marginTop: 14 }}>
+              <div ref={revRef} style={{ ...cardStyle, padding: 14 }}>
                 <h3 style={{ margin: '0 0 8px' }}>Monthly Revenue</h3>
-                <div ref={revRef} style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', alignItems: 'end', gap: 7, height: 210 }}>
-                  {months.map((m, idx) => {
-                    const h = (m.revenue / peakRevenue) * 170;
-                    const isPeak = m.month === 'May' || m.month === 'Sep';
-                    return <div key={m.month} style={{ textAlign: 'center' }}><div style={{ height: revInView ? h : 0, transition: `height .8s cubic-bezier(0.22, 1, 0.36, 1) ${idx * 60}ms`, borderRadius: 8, background: isPeak ? 'linear-gradient(180deg,#F2A27F,#E07B54)' : 'linear-gradient(180deg,#2AA1A1,#0D4F4F)' }} /><div style={{ marginTop: 6, fontSize: 11, color: COLORS.muted }}>{m.month}</div></div>;
-                  })}
+                <div style={{ width: '100%', height: 260 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={monthlyRevenueChartData} margin={{ top: 8, right: 8, left: 4, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="barTeal" x1="0" y1="1" x2="0" y2="0">
+                          <stop offset="0%" stopColor="#0D4F4F" />
+                          <stop offset="100%" stopColor="#1A8A8A" />
+                        </linearGradient>
+                        <linearGradient id="barCoral" x1="0" y1="1" x2="0" y2="0">
+                          <stop offset="0%" stopColor="#E07B54" />
+                          <stop offset="100%" stopColor="#F2A27F" />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke={COLORS.border} vertical={false} />
+                      <XAxis dataKey="month" tick={axisTick} axisLine={{ stroke: COLORS.border }} tickLine={false} />
+                      <YAxis tickFormatter={(v) => `${Math.round(v / 1000)}K`} tick={axisTick} axisLine={{ stroke: COLORS.border }} tickLine={false} />
+                      <Tooltip formatter={(v) => tooltipCurrencyK(v)} labelStyle={{ color: COLORS.dark }} />
+                      <Legend />
+                      <Bar dataKey="revenue" name="Revenue" radius={[6, 6, 0, 0]} isAnimationActive={revInView} animationDuration={900}>
+                        {monthlyRevenueChartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.peak ? 'url(#barCoral)' : 'url(#barTeal)'} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', marginTop: 10, gap: 8 }}>
-                  {[['Avg', avgRevenue], ['Peak', peakRevenue], ['Low', lowRevenue], ['Spread', peakRevenue - lowRevenue]].map(([k, v]) => <div key={k} style={{ background: '#f8fafb', borderRadius: 10, padding: 8 }}><div style={{ color: COLORS.muted, fontSize: 12 }}>{k}</div><div style={{ fontWeight: 700 }}>{formatCurrency(v)}</div></div>)}
+                  {[['Avg', avgRevenue], ['Peak', peakRevenue], ['Low', lowRevenue], ['Spread', peakRevenue - lowRevenue]].map(([k, v]) => (
+                    <div key={k} style={{ background: '#f8fafb', borderRadius: 10, padding: 8 }}>
+                      <div style={{ color: COLORS.muted, fontSize: 12 }}>{k}</div>
+                      <div style={{ fontWeight: 700 }}>{formatCurrency(v)}</div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
-              <div style={{ ...cardStyle, padding: 14 }}>
+              <div ref={donutRef} style={{ ...cardStyle, padding: 14 }}>
                 <h3 style={{ margin: '0 0 8px' }}>Expense Allocation</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', alignItems: 'center' }}>
-                  <svg viewBox="0 0 300 300" width="100%" height="240">
-                    {donutPaths.map((slice, i) => <path key={slice.name} d={slice.d} fill={slice.color} opacity={hoverSlice < 0 || hoverSlice === i ? 1 : 0.25} onMouseEnter={() => setHoverSlice(i)} onMouseLeave={() => setHoverSlice(-1)} style={{ transition: 'all .2s ease' }} />)}
-                    <text x="150" y="145" textAnchor="middle" fontSize="14" fill={COLORS.muted}>Total Expenses</text>
-                    <text x="150" y="167" textAnchor="middle" fontSize="24" fontWeight="800" fill={COLORS.dark}>$12.76M</text>
-                  </svg>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, alignItems: 'center' }}>
+                  <div style={{ position: 'relative', width: '100%', height: 280 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={expenseAllocation}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={70}
+                          outerRadius={100}
+                          paddingAngle={2}
+                          isAnimationActive={donutInView}
+                          animationDuration={800}
+                        >
+                          {expenseAllocation.map((s) => (
+                            <Cell key={s.name} fill={s.color} stroke="#fff" strokeWidth={2} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(v) => `${Number(v).toFixed(1)}%`} />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center', pointerEvents: 'none' }}>
+                      <div style={{ fontSize: 12, color: COLORS.muted }}>Total Expenses</div>
+                      <div style={{ fontSize: 22, fontWeight: 800, color: COLORS.dark }}>$12.76M</div>
+                    </div>
+                  </div>
                   <div style={{ display: 'grid', gap: 6 }}>
-                    {expenseAllocation.map((x) => <div key={x.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: x.color }} />{x.name}</span><span style={{ ...badge(x.color) }}>{x.value}%</span></div>)}
+                    {expenseAllocation.map((x) => (
+                      <div key={x.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ width: 10, height: 10, borderRadius: 3, background: x.color }} />
+                          {x.name}
+                        </span>
+                        <span style={badge(x.color)}>{x.value}%</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: 14, marginTop: 14 }}>
+              <div style={{ ...cardStyle, padding: 14 }}>
+                <h3 style={{ margin: '0 0 10px' }}>COGS summary</h3>
+                <table className="tbl" style={{ minWidth: 0 }}>
+                  <thead><tr><th>Category</th><th>Amount</th><th>% Rev</th></tr></thead>
+                  <tbody>
+                    {cogsSummaryRows.map((r) => (
+                      <tr key={r.label}>
+                        <td>{r.label}</td>
+                        <td>{formatCurrency(r.amount)}</td>
+                        <td><span style={badge(COLORS.teal)}>{r.pct}</span></td>
+                      </tr>
+                    ))}
+                    <tr style={{ fontWeight: 800, background: '#F8FBFC' }}>
+                      <td>Total COGS</td>
+                      <td>{formatCurrency(totals.cogs)}</td>
+                      <td><span style={badge(COLORS.coral)}>72.8%</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ ...cardStyle, padding: 14 }}>
+                <h3 style={{ margin: '0 0 10px' }}>OpEx summary</h3>
+                <table className="tbl" style={{ minWidth: 0 }}>
+                  <thead><tr><th>Bucket</th><th>Amount</th><th>% Rev</th></tr></thead>
+                  <tbody>
+                    {opexSummaryRows.map((r) => (
+                      <tr key={r.label}>
+                        <td>{r.label}</td>
+                        <td>{r.amount ? formatCurrency(r.amount) : '—'}</td>
+                        <td><span style={badge(COLORS.mid)}>{r.pct}</span></td>
+                      </tr>
+                    ))}
+                    <tr style={{ fontWeight: 800, background: '#F8FBFC' }}>
+                      <td>Total OpEx</td>
+                      <td>{formatCurrency(totals.opex)}</td>
+                      <td><span style={badge(COLORS.slate)}>{pct(totals.opex, ANNUAL_REVENUE_DISPLAY)}</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div ref={yoyRef} style={{ ...cardStyle, padding: 14, marginTop: 14 }}>
+              <h3 style={{ margin: '0 0 8px' }}>YoY growth (2024 vs 2025)</h3>
+              <p style={{ margin: '0 0 8px', fontSize: 13, color: COLORS.muted }}>Revenue +7.3% · Net Income +84.2% · Gross Margin +4.2 pts · Net Margin +69.6%</p>
+              <div style={{ width: '100%', height: 280 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart layout="vertical" data={yoyChartData} margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={COLORS.border} horizontal={false} />
+                    <XAxis type="number" tick={axisTick} axisLine={{ stroke: COLORS.border }} tickLine={false} tickFormatter={(v) => `${v}`} domain={[80, 'auto']} label={{ value: 'Index (2024 = 100)', position: 'insideBottom', offset: -4, fill: COLORS.muted, fontSize: 11 }} />
+                    <YAxis type="category" dataKey="metric" width={110} tick={axisTick} axisLine={{ stroke: COLORS.border }} tickLine={false} />
+                    <Tooltip
+                      formatter={(value, name, props) => {
+                        const row = props?.payload;
+                        if (!row) return value;
+                        if (name === '2024') return row.tip2024;
+                        if (name === '2025') return row.tip2025;
+                        return value;
+                      }}
+                      labelStyle={{ color: COLORS.dark }}
+                    />
+                    <Legend />
+                    <Bar dataKey="y2024" name="2024" fill={COLORS.slate} radius={[0, 4, 4, 0]} isAnimationActive={yoyInView} />
+                    <Bar dataKey="y2025" name="2025" fill={COLORS.teal} radius={[0, 4, 4, 0]} isAnimationActive={yoyInView} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div style={{ ...cardStyle, padding: 20, marginTop: 14, background: 'linear-gradient(120deg,#0D4F4F,#1A8A8A)', color: '#fff' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 16, textAlign: 'center' }}>
+                <div><div style={{ opacity: 0.85, fontSize: 13 }}>Gross Margin</div><div style={{ fontWeight: 800, fontSize: 34 }}>27.2%</div></div>
+                <div><div style={{ opacity: 0.85, fontSize: 13 }}>Net Margin</div><div style={{ fontWeight: 800, fontSize: 34 }}>3.9%</div></div>
+                <div><div style={{ opacity: 0.85, fontSize: 13 }}>Monthly Avg Revenue</div><div style={{ fontWeight: 800, fontSize: 34 }}>{formatCurrency(avgRevenue)}</div></div>
               </div>
             </div>
           </section>
@@ -297,7 +520,28 @@ const FinancialDashboard = () => {
           <section id="monthly" ref={(el) => { sectionRefs.current.monthly = el; }} style={{ marginBottom: 34, scrollMarginTop: 80 }}>
             <SectionTitle title="2. Monthly Report" subtitle="Complete 2025 P&L with month-level profitability profile." />
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(170px,1fr))', gap: 10, marginBottom: 10 }}>
-              {[['Best Month', `May ${formatCurrency(93000)}`], ['Worst Month', `Dec ${formatCurrency(6000)}`], ['Avg Net/Mo', formatCurrency(44000)], ['All Profitable', '12 / 12']].map(([k, v]) => <div key={k} style={{ ...cardStyle, padding: 12 }}><div style={{ color: COLORS.muted, fontSize: 12 }}>{k}</div><div style={{ fontWeight: 800, fontSize: 24 }}>{v}</div></div>)}
+              {[['Best Month', `May ${formatCurrency(93000)}`], ['Worst Month', `Dec ${formatCurrency(6000)}`], ['Avg Net/Mo', formatCurrency(44000)], ['All Profitable', '12 / 12']].map(([k, v]) => (
+                <div key={k} style={{ ...cardStyle, padding: 12 }}><div style={{ color: COLORS.muted, fontSize: 12 }}>{k}</div><div style={{ fontWeight: 800, fontSize: 24 }}>{v}</div></div>
+              ))}
+            </div>
+            <div ref={netBarRef} style={{ ...cardStyle, padding: 14, marginBottom: 12 }}>
+              <h3 style={{ margin: '0 0 8px' }}>Net Income by month</h3>
+              <div style={{ width: '100%', height: 220 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={netIncomeBarData} margin={{ top: 8, right: 8, left: 4, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={COLORS.border} vertical={false} />
+                    <XAxis dataKey="month" tick={axisTick} axisLine={{ stroke: COLORS.border }} tickLine={false} />
+                    <YAxis tickFormatter={(v) => `${Math.round(v / 1000)}K`} tick={axisTick} axisLine={{ stroke: COLORS.border }} tickLine={false} />
+                    <Tooltip formatter={(v) => tooltipCurrencyK(v)} labelStyle={{ color: COLORS.dark }} />
+                    <Legend />
+                    <Bar dataKey="net" name="Net Income" radius={[4, 4, 0, 0]} isAnimationActive={netBarInView} animationDuration={800}>
+                      {netIncomeBarData.map((e, i) => (
+                        <Cell key={`net-${i}`} fill={e.fill} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
             <div style={{ ...cardStyle, overflowX: 'auto' }}>
               <table className="tbl">
@@ -306,7 +550,18 @@ const FinancialDashboard = () => {
                   {months.map((m) => {
                     const gp = m.revenue - m.cogs;
                     const peak = m.month === 'May' || m.month === 'Sep';
-                    return <tr key={m.month} style={{ background: peak ? 'rgba(46,196,182,0.08)' : '#fff' }}><td>{m.month}</td><td>{formatMoney(m.revenue)}</td><td>{formatMoney(m.cogs)}</td><td>{formatMoney(gp)}</td><td>{pct(gp, m.revenue)}</td><td>{formatMoney(m.opex)}</td><td style={{ color: m.net > 50000 ? COLORS.mint : m.net < 20000 ? COLORS.coral : COLORS.teal, fontWeight: 700 }}>{formatMoney(m.net)}</td><td>{pct(m.net, m.revenue)}</td></tr>;
+                    return (
+                      <tr key={m.month} style={{ background: peak ? 'rgba(46,196,182,0.08)' : '#fff' }}>
+                        <td>{m.month}</td>
+                        <td>{formatMoney(m.revenue)}</td>
+                        <td>{formatMoney(m.cogs)}</td>
+                        <td>{formatMoney(gp)}</td>
+                        <td>{pct(gp, m.revenue)}</td>
+                        <td>{formatMoney(m.opex)}</td>
+                        <td style={{ color: m.net > 50000 ? COLORS.mint : m.net < 20000 ? COLORS.coral : COLORS.teal, fontWeight: 700 }}>{formatMoney(m.net)}</td>
+                        <td>{pct(m.net, m.revenue)}</td>
+                      </tr>
+                    );
                   })}
                   <tr style={{ background: '#F8FBFC', fontWeight: 800 }}><td>TOTAL</td><td>{formatMoney(totals.revenue)}</td><td>{formatMoney(totals.cogs)}</td><td>{formatMoney(gross)}</td><td>27.2%</td><td>{formatMoney(totals.opex)}</td><td>{formatMoney(totals.net)}</td><td>3.9%</td></tr>
                 </tbody>
@@ -319,11 +574,20 @@ const FinancialDashboard = () => {
             <div style={{ ...cardStyle, overflowX: 'auto', marginBottom: 10 }}>
               <table className="tbl"><thead><tr><th>Line Item</th><th>Annual</th><th>Monthly Avg</th><th>% Revenue</th></tr></thead><tbody>{opexItems.map(([name, annual, p]) => { const b = p >= 2 ? COLORS.coral : p >= 1 ? COLORS.mid : COLORS.slate; return <tr key={name}><td>{name}</td><td>{formatCurrency(annual)}</td><td>{formatCurrency(annual / 12)}</td><td><span style={badge(b)}>{p.toFixed(1)}%</span></td></tr>; })}</tbody></table>
             </div>
-            <div style={{ ...cardStyle, padding: 12 }}>
+            <div ref={expBarRef} style={{ ...cardStyle, padding: 12 }}>
               <h3 style={{ marginTop: 0 }}>Top 5 Expense Drivers</h3>
-              {[
-                ['Rent', 1052000], ['Payroll Admin', 845000], ['Rent Mgmt', 262000], ['Repairs Equipment', 245000], ['Interest', 197000],
-              ].map(([n, v]) => <div key={n} style={{ marginBottom: 8 }}><div style={{ display: 'flex', justifyContent: 'space-between' }}><span>{n}</span><strong>{formatCurrency(v)}</strong></div><div style={{ height: 10, background: '#EAF0F3', borderRadius: 8 }}><div style={{ width: `${(v / 1052000) * 100}%`, height: '100%', borderRadius: 8, background: 'linear-gradient(90deg,#1A8A8A,#0D4F4F)' }} /></div></div>)}
+              <div style={{ width: '100%', height: 260 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart layout="vertical" data={top5ExpenseChartData} margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={COLORS.border} horizontal={false} />
+                    <XAxis type="number" tick={axisTick} axisLine={{ stroke: COLORS.border }} tickLine={false} tickFormatter={(v) => `${Math.round(v / 1000)}K`} />
+                    <YAxis type="category" dataKey="name" width={130} tick={axisTick} axisLine={{ stroke: COLORS.border }} tickLine={false} />
+                    <Tooltip formatter={(v) => tooltipCurrencyK(v)} labelStyle={{ color: COLORS.dark }} />
+                    <Legend />
+                    <Bar dataKey="value" name="Annual" fill={COLORS.mid} radius={[0, 8, 8, 0]} isAnimationActive={expBarInView} animationDuration={800} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </section>
 
@@ -344,17 +608,20 @@ const FinancialDashboard = () => {
             </div>
             <div ref={utilRef} style={{ ...cardStyle, padding: 12, marginBottom: 10 }}>
               <h3 style={{ marginTop: 0 }}>Monthly Utilities (Stacked)</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12,1fr)', alignItems: 'end', height: 210, gap: 8 }}>
-                {months.map((m, idx) => {
-                  const t = m.gas + m.elec + m.water + m.waste;
-                  const scale = 180 / Math.max(...months.map((x) => x.gas + x.elec + x.water + x.waste));
-                  const heights = [m.gas * scale, m.elec * scale, m.water * scale, m.waste * scale];
-                  return <div key={m.month} style={{ textAlign: 'center' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column-reverse', height: utilInView ? t * scale : 0, transition: `height .8s cubic-bezier(0.22,1,0.36,1) ${idx * 45}ms`, borderRadius: 8, overflow: 'hidden' }}>
-                      <div style={{ height: heights[3], background: COLORS.tan }} /><div style={{ height: heights[2], background: COLORS.mid }} /><div style={{ height: heights[1], background: COLORS.teal }} /><div style={{ height: heights[0], background: COLORS.coral }} />
-                    </div><div style={{ marginTop: 6, fontSize: 11, color: COLORS.muted }}>{m.month}</div>
-                  </div>;
-                })}
+              <div style={{ width: '100%', height: 280 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={utilitiesStackData} margin={{ top: 8, right: 8, left: 4, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={COLORS.border} vertical={false} />
+                    <XAxis dataKey="month" tick={axisTick} axisLine={{ stroke: COLORS.border }} tickLine={false} />
+                    <YAxis tickFormatter={(v) => `${Math.round(v / 1000)}K`} tick={axisTick} axisLine={{ stroke: COLORS.border }} tickLine={false} />
+                    <Tooltip formatter={(v) => tooltipCurrencyK(v)} labelStyle={{ color: COLORS.dark }} />
+                    <Legend />
+                    <Bar dataKey="Gas" stackId="u" fill={COLORS.coral} isAnimationActive={utilInView} animationDuration={800} />
+                    <Bar dataKey="Electricity" stackId="u" fill={COLORS.teal} isAnimationActive={utilInView} animationDuration={800} />
+                    <Bar dataKey="Water" stackId="u" fill={COLORS.mid} isAnimationActive={utilInView} animationDuration={800} />
+                    <Bar dataKey="Wastewater" stackId="u" fill={COLORS.tan} isAnimationActive={utilInView} animationDuration={800} />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
             </div>
             <div style={{ ...cardStyle, overflowX: 'auto' }}>
@@ -368,9 +635,28 @@ const FinancialDashboard = () => {
               <div style={{ ...cardStyle, padding: 12 }}><div style={{ color: COLORS.muted }}>Production Payroll (COGS)</div><div style={{ fontWeight: 800, fontSize: 30 }}>{formatCurrency(4120000)}</div><span style={badge(COLORS.teal)}>31.0%</span></div>
               <div style={{ ...cardStyle, padding: 12 }}><div style={{ color: COLORS.muted }}>Admin Payroll (OpEx)</div><div style={{ fontWeight: 800, fontSize: 30 }}>{formatCurrency(1230000)}</div><span style={badge(COLORS.mid)}>9.2%</span></div>
             </div>
-            <div style={{ ...cardStyle, padding: 12, marginBottom: 10 }}>
+            <div ref={payBarRef} style={{ ...cardStyle, padding: 12, marginBottom: 10 }}>
               <h3 style={{ marginTop: 0 }}>Payroll Components</h3>
-              {payrollBars.map(([name, annual, avg]) => <div key={name} style={{ marginBottom: 8 }}><div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}><span>{name} <span style={{ color: COLORS.muted }}>({formatCurrency(avg)}/mo)</span></span><strong>{formatCurrency(annual)}</strong></div><div style={{ height: 10, borderRadius: 8, background: '#e8eff3' }}><div style={{ width: `${(annual / 3410000) * 100}%`, height: '100%', borderRadius: 8, background: 'linear-gradient(90deg,#2AA1A1,#0D4F4F)' }} /></div></div>)}
+              <div style={{ width: '100%', height: 320 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart layout="vertical" data={payrollChartData} margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={COLORS.border} horizontal={false} />
+                    <XAxis type="number" tick={axisTick} axisLine={{ stroke: COLORS.border }} tickLine={false} tickFormatter={(v) => `${Math.round(v / 1000)}K`} />
+                    <YAxis type="category" dataKey="name" width={118} tick={axisTick} axisLine={{ stroke: COLORS.border }} tickLine={false} />
+                    <Tooltip formatter={(v) => tooltipCurrencyK(v)} labelStyle={{ color: COLORS.dark }} />
+                    <Legend />
+                    <Bar dataKey="annual" name="Annual" fill={COLORS.teal} radius={[0, 8, 8, 0]} isAnimationActive={payBarInView} animationDuration={800} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div style={{ marginTop: 8, display: 'grid', gap: 6, fontSize: 13, color: COLORS.muted }}>
+                {payrollChartData.map((row) => (
+                  <div key={row.name} style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                    <span>{row.name}</span>
+                    <span>{formatCurrency(row.avg)}/mo avg</span>
+                  </div>
+                ))}
+              </div>
             </div>
             <div style={{ ...cardStyle, padding: 16, background: 'linear-gradient(120deg,#0D4F4F,#1A8A8A)', color: '#fff' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 12 }}>
