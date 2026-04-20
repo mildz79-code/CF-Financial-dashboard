@@ -123,12 +123,20 @@ export function getFinancialYearData(year) {
   const cogss = allocateExact(round(targetCogs), cogsW);
   const opexs = allocateExact(round(targetOpex), opexW);
 
+  const revenueTotal = revs.reduce((s, v) => s + v, 0);
+
   const cogsSeedTotal = sumSeed(COGS_SEED, (r) => r[1]);
   const sCogs = targetCogs / cogsSeedTotal;
 
   const cogsItems = COGS_SEED.map(([name, seedAmt, desc, cat]) => {
     const annual = round(seedAmt * sCogs);
-    return { name, annual, desc, cat };
+    return {
+      name,
+      annual,
+      desc,
+      cat,
+      pctRev: revenueTotal > 0 ? (annual / revenueTotal) * 100 : 0,
+    };
   });
 
   const utilityAnnual = cogsItems.filter((c) => c.cat === 'utility').reduce((s, c) => s + c.annual, 0);
