@@ -12,6 +12,7 @@
     "@supabase/supabase-js": "latest",
     "react": "latest",
     "react-dom": "latest",
+    "react-router-dom": "^7.14.1",
     "recharts": "^3.8.1"
   },
   "devDependencies": {
