@@ -9,6 +9,9 @@ The dashboard now runs as a Vite React app and includes:
 - Existing FY2025 static design sections (overview, COGS, payroll, utilities, expenses, monthly report)
 - New **2026 Snapshot (Supabase)** section with source toggle (`actual`, `budget`, `forecast`) backed by `pl_category_summary`
 
+> **Working on real financials?** See [`LOCAL_SETUP.md`](./LOCAL_SETUP.md) — real
+> data files are gitignored and must live only on your local machine.
+
 ### Local run
 
 ```bash
@@ -31,11 +34,11 @@ If env vars are missing, the app still loads and shows a guidance message in the
 
 ```
 .
-├── 2026_monthly_budget.xlsx          # Original 2026 budget (Jan baseline populated)
-├── 2026_monthly_budget_korean.xlsx   # Korean-language parallel version
+├── 2026_monthly_budget.xlsx          # (local-only, gitignored) Original 2026 budget
+├── 2026_monthly_budget_korean.xlsx   # (local-only, gitignored) Korean parallel version
 ├── prompt_to_recreate_2026_budget.md # Reusable prompt for regenerating the budget
 ├── data/
-│   └── 2026/
+│   └── 2026/                         # (local-only, gitignored)
 │       ├── Jan_PL.csv                # January 2026 QuickBooks P&L export
 │       ├── Feb_PL.csv                # February 2026 QuickBooks P&L export
 │       ├── Mar_PL.csv                # March 2026 QuickBooks P&L export
@@ -47,7 +50,7 @@ If env vars are missing, the app still loads and shows a guidance message in the
 │       ├── 001_create_pl_tables.sql      # pl_line_items + pl_monthly
 │       ├── 002_create_pl_views.sql       # pl_monthly_wide + pl_category_summary
 │       ├── 003_create_storage_bucket.sql # private 'financials' bucket
-│       └── 004_seed_2026_data.sql        # 2026 line items + Q1 actuals + budget
+│       └── 004_seed_2026_data.sql        # (local-only, gitignored) 2026 seed data
 ├── docs/
 │   └── SCHEMA.md                     # Database schema reference
 ├── .env.example

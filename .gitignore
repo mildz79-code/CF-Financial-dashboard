@@ -3,3 +3,16 @@ dist/
 .env
 .env.*
 !.env.example
+
+# Sensitive financial data — keep local only
+2026_monthly_budget*.xlsx
+data/2026/*.csv
+data/2026/*.xlsx
+supabase/migrations/004_seed_2026_data.sql
+
+# Private / local-only scratch folders
+private/
+local/
+
+# Python virtualenv
+.venv/
