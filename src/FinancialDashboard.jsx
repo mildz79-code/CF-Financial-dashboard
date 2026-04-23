@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { NavLink } from 'react-router-dom';
+import { getFinancialYearData } from './financialYearData.js';
 
 /** Design system — Color Fashion Dye & Finishing FY 2025 */
 const ds = {
@@ -168,118 +170,28 @@ function SectionHeader({ title, subtitle, style }) {
   );
 }
 
-const MONTH_ROWS = [
-  { month: 'Jan', revenue: 1132141, cogs: 823600, opex: 265200, net: 43341 },
-  { month: 'Feb', revenue: 1054328, cogs: 767200, opex: 257100, net: 30028 },
-  { month: 'Mar', revenue: 978560, cogs: 712400, opex: 243800, net: 22360 },
-  { month: 'Apr', revenue: 1098745, cogs: 799800, opex: 258300, net: 40645 },
-  { month: 'May', revenue: 1326890, cogs: 965600, opex: 268500, net: 92790 },
-  { month: 'Jun', revenue: 1189234, cogs: 865700, opex: 242400, net: 81134 },
-  { month: 'Jul', revenue: 1067450, cogs: 777100, opex: 252200, net: 38150 },
-  { month: 'Aug', revenue: 1245670, cogs: 906800, opex: 256600, net: 82270 },
-  { month: 'Sep', revenue: 1298340, cogs: 945200, opex: 264300, net: 88840 },
-  { month: 'Oct', revenue: 1156780, cogs: 842100, opex: 258900, net: 55780 },
-  { month: 'Nov', revenue: 1089432, cogs: 793100, opex: 254700, net: 41632 },
-  { month: 'Dec', revenue: 944430, cogs: 687400, opex: 250900, net: 6130 },
-];
-
-const UTIL_K = [
-  { month: 'Jan', gas: 118, elec: 78, water: 32, waste: 16 },
-  { month: 'Feb', gas: 112, elec: 74, water: 30, waste: 15 },
-  { month: 'Mar', gas: 98, elec: 68, water: 27, waste: 13 },
-  { month: 'Apr', gas: 92, elec: 65, water: 26, waste: 13 },
-  { month: 'May', gas: 105, elec: 72, water: 31, waste: 15 },
-  { month: 'Jun', gas: 98, elec: 70, water: 30, waste: 14 },
-  { month: 'Jul', gas: 88, elec: 66, water: 28, waste: 13 },
-  { month: 'Aug', gas: 102, elec: 71, water: 30, waste: 15 },
-  { month: 'Sep', gas: 108, elec: 74, water: 31, waste: 15 },
-  { month: 'Oct', gas: 100, elec: 70, water: 29, waste: 14 },
-  { month: 'Nov', gas: 96, elec: 67, water: 28, waste: 14 },
-  { month: 'Dec', gas: 90, elec: 62, water: 23, waste: 14 },
-].map((r) => ({
-  ...r,
-  gas$: r.gas * 1000,
-  elec$: r.elec * 1000,
-  water$: r.water * 1000,
-  waste$: r.waste * 1000,
-  total$: (r.gas + r.elec + r.water + r.waste) * 1000,
-}));
-
-const EXPENSE_ALLOCATION = [
-  { name: 'Payroll', pct: 30.5, color: C.teal },
-  { name: 'Materials', pct: 20.5, color: C.midTeal },
-  { name: 'Utilities', pct: 19.3, color: C.coral },
-  { name: 'Rent', pct: 10.6, color: C.tan },
-  { name: 'Prof Fees', pct: 1.9, color: C.slate },
-  { name: 'Other', pct: 17.2, color: C.mint },
-];
-
-const OPEX_ITEMS = [
-  ['Payroll Admin', 845000, 6.4],
-  ['Payroll Taxes', 156000, 1.2],
-  ['Employee Benefits', 98000, 0.7],
-  ['Rent Expense', 1052000, 7.9],
-  ['Rent Management Fee', 262000, 2.0],
-  ['Professional Fees Legal', 72000, 0.5],
-  ['Professional Fees Other', 40000, 0.3],
-  ['Sales Commission', 65000, 0.5],
-  ['Sales Promotion', 18000, 0.1],
-  ['Office Expense', 42000, 0.3],
-  ['Office Supplies', 28000, 0.2],
-  ['Computer & Internet', 36000, 0.3],
-  ['Telephone', 22000, 0.2],
-  ['Automobile', 48000, 0.4],
-  ['Repairs Computer', 35000, 0.3],
-  ['Repairs Equipment', 245000, 1.8],
-  ['Insurance Health', 89000, 0.7],
-  ['Insurance Truck', 47000, 0.4],
-  ['Licenses', 15000, 0.1],
-  ['Contract Labor', 126000, 0.9],
-  ['Outside Service', 78000, 0.6],
-  ['Interest Expense', 197000, 1.5],
-  ['Other/Misc', 71000, 0.5],
-];
-
-const COGS_LINE_ITEMS = [
-  { category: 'labor', item: 'Direct Labor Samuel Hale', description: 'Primary production contractor', annual: 3410000, pctCogs: 25.7 },
-  { category: 'labor', item: 'Direct Labor Workforce', description: 'Hourly production staff', annual: 532000, pctCogs: 4.0 },
-  { category: 'labor', item: 'Payroll Other COGS', description: 'Overtime bonuses', annual: 178000, pctCogs: 1.3 },
-  { category: 'materials', item: 'Chemical & Dyestuffs', description: 'Dyes chemicals', annual: 2353000, pctCogs: 17.7 },
-  { category: 'materials', item: 'Finishing Supplies Paper Tube', description: 'Packaging tubes', annual: 98000, pctCogs: 0.7 },
-  { category: 'materials', item: 'Lab Supplies Testing', description: 'Quality testing', annual: 67000, pctCogs: 0.5 },
-  { category: 'materials', item: 'Plant Supplies & Parts', description: 'Machine parts', annual: 89000, pctCogs: 0.7 },
-  { category: 'other', item: 'Freight & Shipping', description: 'Logistics', annual: 168000, pctCogs: 1.3 },
-  { category: 'other', item: 'Truck Repair', description: 'Fleet maintenance', annual: 45000, pctCogs: 0.3 },
-  { category: 'other', item: 'Insurance Liability', description: 'Plant coverage', annual: 50000, pctCogs: 0.4 },
-  { category: 'utilities', item: 'Utilities Gas', description: 'Boiler & heating', annual: 1207000, pctCogs: 9.1 },
-  { category: 'utilities', item: 'Utilities Electricity', description: 'Machine power', annual: 837000, pctCogs: 6.3 },
-  { category: 'utilities', item: 'Utilities Water', description: 'Process water', annual: 345000, pctCogs: 2.6 },
-  { category: 'utilities', item: 'Utilities Wastewater', description: 'Treatment', annual: 171000, pctCogs: 1.3 },
-];
-
-const TOP5_OPEX = [
-  { label: 'Rent', value: 1052000 },
-  { label: 'Payroll Admin', value: 845000 },
-  { label: 'Rent Mgmt', value: 262000 },
-  { label: 'Repairs Equipment', value: 245000 },
-  { label: 'Interest', value: 197000 },
-];
-
-const PAYROLL_BARS = [
-  { label: 'Samuel Hale', annual: 3410000, monthly: 284000, sub: 'Primary production contractor' },
-  { label: 'Admin Payroll', annual: 845000, monthly: 70000, sub: 'Office staff' },
-  { label: 'Workforce', annual: 532000, monthly: 44000, sub: 'Hourly production' },
-  { label: 'Payroll Other', annual: 178000, monthly: 15000, sub: 'Overtime bonuses' },
-  { label: 'Payroll Taxes', annual: 156000, monthly: 13000, sub: 'Employer taxes' },
-  { label: 'Contract Labor', annual: 126000, monthly: 11000, sub: 'Temp workers' },
-  { label: 'Benefits', annual: 98000, monthly: 8000, sub: 'Health & retirement' },
-];
-
-const DISPLAY_REVENUE = 13_280_000;
-const DISPLAY_COGS = 9_670_000;
-const DISPLAY_GROSS = 3_610_000;
-const DISPLAY_NET = 523_000;
 const SCROLL_MARGIN = 88;
+
+const yearLinkStyle = ({ isActive }) => ({
+  padding: '6px 12px',
+  borderRadius: 10,
+  fontWeight: 700,
+  fontSize: 13,
+  textDecoration: 'none',
+  color: isActive ? '#fff' : C.teal,
+  background: isActive ? C.teal : 'rgba(13,79,79,0.08)',
+  border: `1px solid ${isActive ? C.teal : 'transparent'}`,
+});
+
+const PAYROLL_SUBS = {
+  'Samuel Hale': 'Primary production contractor',
+  'Admin Payroll': 'Office staff',
+  Workforce: 'Hourly production',
+  'Payroll Other': 'Overtime bonuses',
+  'Payroll Taxes': 'Employer taxes',
+  'Contract Labor': 'Temp workers',
+  Benefits: 'Health & retirement',
+};
 
 function IconOverview() {
   return (
@@ -361,14 +273,14 @@ function donutSlicePath(cx, cy, innerR, outerR, startAngle, endAngle) {
   ].join(' ');
 }
 
-function ExpenseDonut() {
+function ExpenseDonut({ allocation, centerLine2 }) {
   const [hovered, setHovered] = useState(null);
   const cx = 120;
   const cy = 120;
   const inner = 60;
   const baseOuter = 98;
   let angle = 0;
-  const slices = EXPENSE_ALLOCATION.map((s) => {
+  const slices = allocation.map((s) => {
     const sweep = (s.pct / 100) * 360;
     const start = angle;
     const end = angle + sweep;
@@ -405,17 +317,17 @@ function ExpenseDonut() {
         Total Expenses
       </text>
       <text x={cx} y={cy + 16} textAnchor="middle" fill={C.darkText} fontSize="20" fontWeight="800" fontFamily={ds.fontFamily}>
-        $12.76M
+        {centerLine2}
       </text>
     </svg>
   );
 }
 
-function MonthlyRevenueBars({ active }) {
-  const max = Math.max(...MONTH_ROWS.map((m) => m.revenue));
+function MonthlyRevenueBars({ active, months }) {
+  const max = Math.max(...months.map((m) => m.revenue));
   return (
     <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 220, paddingTop: 8 }}>
-      {MONTH_ROWS.map((m, i) => {
+      {months.map((m, i) => {
         const h = (m.revenue / max) * 100;
         const peak = m.month === 'May' || m.month === 'Sep';
         return (
@@ -443,7 +355,8 @@ function MonthlyRevenueBars({ active }) {
   );
 }
 
-function YoYGrowthBars({ active }) {
+function YoYGrowthBars({ active, show }) {
+  if (!show) return null;
   const rows = [
     { label: 'Revenue', p2024: 100, p2025: 107.3, d2024: 100, d2025: 107.3 },
     { label: 'Net Income', p2024: 100, p2025: 184.2, d2024: 100, d2025: 184.2 },
@@ -533,11 +446,11 @@ function HorizontalBarChart({ data, max, active, barColor = C.midTeal }) {
   );
 }
 
-function PayrollBarList({ active }) {
-  const max = Math.max(...PAYROLL_BARS.map((p) => p.annual));
+function PayrollBarList({ active, bars }) {
+  const max = Math.max(...bars.map((p) => p.annual));
   return (
     <div style={{ display: 'grid', gap: 18 }}>
-      {PAYROLL_BARS.map((p, i) => {
+      {bars.map((p, i) => {
         const w = (p.annual / max) * 100;
         return (
           <div key={p.label}>
@@ -548,7 +461,7 @@ function PayrollBarList({ active }) {
                   <span style={{ color: C.midTeal }}>{formatCurrency(p.annual)}</span>{' '}
                   <span style={{ color: C.mutedText, fontWeight: 600 }}>({formatCurrency(p.monthly)}/mo)</span>
                 </div>
-                <div style={{ fontSize: 13, color: C.mutedText, marginTop: 2 }}>{p.sub}</div>
+                <div style={{ fontSize: 13, color: C.mutedText, marginTop: 2 }}>{p.sub || PAYROLL_SUBS[p.label] || ''}</div>
               </div>
             </div>
             <div style={{ height: 10, borderRadius: 8, background: C.rowBorder, overflow: 'hidden', marginTop: 8 }}>
@@ -570,8 +483,8 @@ function PayrollBarList({ active }) {
   );
 }
 
-function UtilitiesStackedChart({ active }) {
-  const months = UTIL_K;
+function UtilitiesStackedChart({ active, utilityMonths }) {
+  const months = utilityMonths;
   const max = Math.max(...months.map((m) => m.gas + m.elec + m.water + m.waste));
   return (
     <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 240, paddingTop: 8 }}>
@@ -609,11 +522,11 @@ function UtilitiesStackedChart({ active }) {
   );
 }
 
-function NetIncomeMiniBars({ active }) {
-  const max = Math.max(...MONTH_ROWS.map((m) => m.net));
+function NetIncomeMiniBars({ active, months }) {
+  const max = Math.max(...months.map((m) => m.net));
   return (
     <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 120 }}>
-      {MONTH_ROWS.map((m, i) => {
+      {months.map((m, i) => {
         const h = (m.net / max) * 100;
         const fill = m.net > 50000 ? '#22c55e' : m.net < 20000 ? C.coral : C.teal;
         return (
@@ -645,7 +558,61 @@ const tableBase = {
   fontFamily: ds.fontFamily,
 };
 
-function FinancialDashboard() {
+function FinancialDashboard({ year }) {
+  const D = useMemo(() => getFinancialYearData(year), [year]);
+
+  const expenseAllocationUi = useMemo(
+    () => D.expenseAllocation.map((s) => ({ name: s.name, pct: s.value, color: s.color })),
+    [D.expenseAllocation]
+  );
+
+  const opexItemsUi = useMemo(() => D.opexItems.map((o) => [o.name, o.annual, o.pctRev]), [D.opexItems]);
+
+  const cogsLineUi = useMemo(
+    () =>
+      D.cogsItems.map((c) => ({
+        category: c.cat === 'utility' ? 'utilities' : c.cat === 'material' ? 'materials' : c.cat,
+        item: c.name,
+        description: c.desc,
+        annual: c.annual,
+        pctCogs: D.totals.cogs > 0 ? (c.annual / D.totals.cogs) * 100 : 0,
+      })),
+    [D.cogsItems, D.totals.cogs]
+  );
+
+  const payrollBarsUi = useMemo(
+    () => D.payrollBars.map((p) => ({ label: p.name, annual: p.annual, monthly: p.avg })),
+    [D.payrollBars]
+  );
+
+  const top5ForChart = useMemo(
+    () => D.top5ExpenseChartData.map((x) => ({ label: x.name, value: x.value })),
+    [D.top5ExpenseChartData]
+  );
+
+  const utilityMonthsScaled = useMemo(
+    () =>
+      D.months.map((m) => ({
+        month: m.month,
+        gas: m.gas / 1000,
+        elec: m.elec / 1000,
+        water: m.water / 1000,
+        waste: m.waste / 1000,
+      })),
+    [D.months]
+  );
+
+  const revStats = useMemo(() => {
+    const peak = Math.max(...D.months.map((m) => m.revenue));
+    const low = Math.min(...D.months.map((m) => m.revenue));
+    return {
+      avg: D.totals.revenue / 12,
+      peak,
+      low,
+      spread: peak - low,
+    };
+  }, [D.months, D.totals.revenue]);
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeNav, setActiveNav] = useState('overview');
   const sectionRefs = useRef({});
@@ -659,16 +626,11 @@ function FinancialDashboard() {
   const [utilChartRef, utilChartIn] = useInView({ threshold: 0.15 });
   const [payrollBarsRef, payrollBarsIn] = useInView({ threshold: 0.15 });
 
-  const totals = useMemo(() => {
-    const revenue = MONTH_ROWS.reduce((a, m) => a + m.revenue, 0);
-    const cogs = MONTH_ROWS.reduce((a, m) => a + m.cogs, 0);
-    const opex = MONTH_ROWS.reduce((a, m) => a + m.opex, 0);
-    const net = MONTH_ROWS.reduce((a, m) => a + m.net, 0);
-    const gross = revenue - cogs;
-    return { revenue, cogs, opex, net, gross };
-  }, []);
-
-  const avgRevDisplay = DISPLAY_REVENUE / 12;
+  const totals = D.totals;
+  const displayRevenue = D.totals.revenue;
+  const displayGross = D.gross;
+  const displayNet = D.totals.net;
+  const displayCogs = D.totals.cogs;
 
   const scrollToSection = useCallback((id) => {
     const el = sectionRefs.current[id];
@@ -693,7 +655,7 @@ function FinancialDashboard() {
 
     elements.forEach((el) => observer.observe(el));
     return () => observer.disconnect();
-  }, []);
+  }, [year]);
 
   const sectionProps = (id) => ({
     id,
@@ -706,7 +668,7 @@ function FinancialDashboard() {
   const opexBadgeTone = (p) => (p >= 2 ? 'coral' : p >= 1 ? 'mid' : 'slate');
   const cogsBadgeTone = (p) => (p >= 5 ? 'teal' : p >= 1 ? 'mid' : 'slate');
 
-  const top5Max = Math.max(...TOP5_OPEX.map((x) => x.value));
+  const top5Max = Math.max(...top5ForChart.map((x) => x.value), 1);
 
   return (
     <>
@@ -753,7 +715,7 @@ function FinancialDashboard() {
         }
       `}</style>
 
-      <div className="cf-wrap">
+      <div className="cf-wrap" key={year}>
         <button
           type="button"
           aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}
@@ -836,7 +798,7 @@ function FinancialDashboard() {
             <div style={{ minWidth: 0 }}>
               <div style={{ fontWeight: 700, fontSize: 15, lineHeight: 1.25, color: C.darkText }}>Color Fashion</div>
               <div style={{ fontSize: 13, color: C.mutedText }}>Dye &amp; Finishing</div>
-              <div style={{ marginTop: 6 }}>
+              <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
                 <span
                   style={{
                     display: 'inline-block',
@@ -849,7 +811,15 @@ function FinancialDashboard() {
                     color: '#fff',
                   }}
                 >
-                  FY 2025
+                  FY {year}
+                </span>
+                <span style={{ display: 'inline-flex', gap: 6 }}>
+                  <NavLink to="/2024" style={yearLinkStyle} end>
+                    2024
+                  </NavLink>
+                  <NavLink to="/2025" style={yearLinkStyle} end>
+                    2025
+                  </NavLink>
                 </span>
               </div>
             </div>
@@ -901,11 +871,11 @@ function FinancialDashboard() {
 
           <Card style={{ padding: 14, marginTop: 16 }}>
             <div style={{ fontSize: 12, color: C.mutedText }}>Revenue</div>
-            <div style={{ fontSize: 20, fontWeight: 800, marginTop: 2 }}>{formatCurrency(DISPLAY_REVENUE)}</div>
+            <div style={{ fontSize: 20, fontWeight: 800, marginTop: 2 }}>{formatCurrency(D.sidebarRevenue)}</div>
             <div style={{ fontSize: 12, color: C.mutedText, marginTop: 8 }}>Net margin</div>
-            <div style={{ fontWeight: 800, color: C.teal }}>3.9%</div>
+            <div style={{ fontWeight: 800, color: C.teal }}>{D.sidebarNetMargin}</div>
             <div style={{ fontSize: 12, color: C.mutedText, marginTop: 6 }}>Gross margin</div>
-            <div style={{ fontWeight: 800, color: C.teal }}>27.2%</div>
+            <div style={{ fontWeight: 800, color: C.teal }}>{D.sidebarGrossMargin}</div>
           </Card>
         </aside>
 
@@ -934,15 +904,23 @@ function FinancialDashboard() {
                 <span style={{ color: C.teal }}>Color Fashion</span>{' '}
                 <span style={{ color: C.coral }}>Dye &amp; Finishing</span>{' '}
                 <span style={{ color: C.mutedText, fontWeight: 700 }}>—</span>{' '}
-                <span style={{ color: C.teal }}>FY 2025</span>{' '}
+                <span style={{ color: C.teal }}>FY {year}</span>{' '}
                 <span style={{ color: C.darkText }}>Financial Dashboard</span>
               </h1>
+              <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+                <NavLink to="/2024" style={yearLinkStyle} end>
+                  View FY 2024
+                </NavLink>
+                <NavLink to="/2025" style={yearLinkStyle} end>
+                  View FY 2025
+                </NavLink>
+              </div>
             </div>
             <Card style={{ padding: '12px 18px', minWidth: 200 }}>
               <div style={{ fontSize: 12, color: C.mutedText, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                 Revenue
               </div>
-              <div style={{ fontSize: 26, fontWeight: 800, color: C.teal }}>{formatCurrency(DISPLAY_REVENUE)}</div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: C.teal }}>{formatCurrency(displayRevenue)}</div>
             </Card>
           </header>
 
@@ -951,7 +929,7 @@ function FinancialDashboard() {
             <div ref={overviewRef}>
               <SectionHeader
                 title="Overview"
-                subtitle="Executive KPIs, revenue cadence, expense mix, and year-over-year performance."
+                subtitle={`Executive KPIs, revenue cadence, expense mix${D.showYoySection ? ', and year-over-year performance' : ''} — FY ${year}.`}
               />
               <div
                 style={{
@@ -963,37 +941,37 @@ function FinancialDashboard() {
                 <Card style={{ padding: 18 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', color: C.mutedText }}>REVENUE</div>
                   <div style={{ fontSize: 32, fontWeight: 800, color: C.teal, marginTop: 6 }}>
-                    <AnimatedNumber value={DISPLAY_REVENUE} active={overviewIn} delay={0} />
+                    <AnimatedNumber value={displayRevenue} active={overviewIn} delay={0} />
                   </div>
                   <div style={{ marginTop: 10 }}>
-                    <Badge tone="teal">+7.3% YoY</Badge>
+                    <Badge tone="teal">{D.kpiYoYLabel}</Badge>
                   </div>
                 </Card>
                 <Card style={{ padding: 18 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', color: C.mutedText }}>GROSS PROFIT</div>
                   <div style={{ fontSize: 32, fontWeight: 800, color: C.midTeal, marginTop: 6 }}>
-                    <AnimatedNumber value={DISPLAY_GROSS} active={overviewIn} delay={90} />
+                    <AnimatedNumber value={displayGross} active={overviewIn} delay={90} />
                   </div>
                   <div style={{ marginTop: 10 }}>
-                    <Badge tone="mid">27.2%</Badge>
+                    <Badge tone="mid">{D.grossKpiSub}</Badge>
                   </div>
                 </Card>
                 <Card style={{ padding: 18 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', color: C.mutedText }}>NET INCOME</div>
                   <div style={{ fontSize: 32, fontWeight: 800, color: C.mint, marginTop: 6 }}>
-                    <AnimatedNumber value={DISPLAY_NET} active={overviewIn} delay={180} />
+                    <AnimatedNumber value={displayNet} active={overviewIn} delay={180} />
                   </div>
                   <div style={{ marginTop: 10 }}>
-                    <Badge tone="mint">3.9%</Badge>
+                    <Badge tone="mint">{D.netKpiSub}</Badge>
                   </div>
                 </Card>
                 <Card style={{ padding: 18 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', color: C.mutedText }}>COGS</div>
                   <div style={{ fontSize: 32, fontWeight: 800, color: C.coral, marginTop: 6 }}>
-                    <AnimatedNumber value={DISPLAY_COGS} active={overviewIn} delay={270} />
+                    <AnimatedNumber value={displayCogs} active={overviewIn} delay={270} />
                   </div>
                   <div style={{ marginTop: 10 }}>
-                    <Badge tone="coral">72.8%</Badge>
+                    <Badge tone="coral">{D.cogsKpiSub}</Badge>
                   </div>
                 </Card>
               </div>
@@ -1009,7 +987,7 @@ function FinancialDashboard() {
             >
               <Card ref={revBarRef} style={{ padding: 18 }}>
                 <SectionHeader title="Monthly revenue" subtitle="May and September peak performance highlighted." />
-                <MonthlyRevenueBars active={revBarIn} />
+                <MonthlyRevenueBars active={revBarIn} months={D.months} />
                 <div
                   style={{
                     marginTop: 16,
@@ -1019,10 +997,10 @@ function FinancialDashboard() {
                   }}
                 >
                   {[
-                    ['Avg', formatCurrency(1_110_000)],
-                    ['Peak', formatCurrency(1_330_000)],
-                    ['Low', formatCurrency(944_000)],
-                    ['Spread', formatCurrency(383_000)],
+                    ['Avg', formatCurrency(revStats.avg)],
+                    ['Peak', formatCurrency(revStats.peak)],
+                    ['Low', formatCurrency(revStats.low)],
+                    ['Spread', formatCurrency(revStats.spread)],
                   ].map(([k, v]) => (
                     <div key={k} style={{ background: C.background, borderRadius: 12, padding: 10 }}>
                       <div style={{ fontSize: 12, color: C.mutedText }}>{k}</div>
@@ -1042,9 +1020,9 @@ function FinancialDashboard() {
                     alignItems: 'center',
                   }}
                 >
-                  <ExpenseDonut />
+                  <ExpenseDonut allocation={expenseAllocationUi} centerLine2={D.totalExpensesLabel} />
                   <div style={{ display: 'grid', gap: 8 }}>
-                    {EXPENSE_ALLOCATION.map((s) => (
+                    {expenseAllocationUi.map((s) => (
                       <div
                         key={s.name}
                         style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}
@@ -1085,27 +1063,22 @@ function FinancialDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {[
-                        { label: 'Labor', amt: 4_120_000, badge: '42.6%' },
-                        { label: 'Materials', amt: 2_510_000, badge: '25.9%' },
-                        { label: 'Utilities', amt: 2_560_000, badge: '26.5%' },
-                        { label: 'Other', amt: 480_000, badge: '5.0%' },
-                      ].map((r) => (
+                      {D.cogsSummaryRows.map((r) => (
                         <tr key={r.label}>
                           <td className="cf-td" style={{ fontWeight: 600 }}>
                             {r.label}
                           </td>
-                          <td className="cf-td">{formatCurrency(r.amt)}</td>
+                          <td className="cf-td">{formatCurrency(r.amount)}</td>
                           <td className="cf-td">
-                            <Badge tone="teal">{r.badge}</Badge>
+                            <Badge tone="teal">{r.pct}</Badge>
                           </td>
                         </tr>
                       ))}
                       <tr style={{ background: 'rgba(237,241,243,0.65)', fontWeight: 800 }}>
                         <td className="cf-td">Total COGS</td>
-                        <td className="cf-td">{formatCurrency(DISPLAY_COGS)}</td>
+                        <td className="cf-td">{formatCurrency(displayCogs)}</td>
                         <td className="cf-td">
-                          <Badge tone="coral">72.8%</Badge>
+                          <Badge tone="coral">{D.cogsKpiSub}</Badge>
                         </td>
                       </tr>
                     </tbody>
@@ -1127,17 +1100,12 @@ function FinancialDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {[
-                        { label: 'Payroll & benefits', amt: 1_099_000, pct: '8.3%' },
-                        { label: 'Rent & occupancy', amt: 1_314_000, pct: '9.9%' },
-                        { label: 'Professional & sales', amt: 253_000, pct: '1.9%' },
-                        { label: 'All other OpEx', amt: 1_407_000, pct: '10.6%' },
-                      ].map((r) => (
+                      {D.opexSummaryRows.map((r) => (
                         <tr key={r.label}>
                           <td className="cf-td" style={{ fontWeight: 600 }}>
                             {r.label}
                           </td>
-                          <td className="cf-td">{formatCurrency(r.amt)}</td>
+                          <td className="cf-td">{r.amount ? formatCurrency(r.amount) : '—'}</td>
                           <td className="cf-td">
                             <Badge tone="mid">{r.pct}</Badge>
                           </td>
@@ -1147,7 +1115,7 @@ function FinancialDashboard() {
                         <td className="cf-td">Total OpEx</td>
                         <td className="cf-td">{formatCurrency(totals.opex)}</td>
                         <td className="cf-td">
-                          <Badge tone="slate">{pctOf(totals.opex, DISPLAY_REVENUE)}</Badge>
+                          <Badge tone="slate">{pctOf(totals.opex, displayRevenue)}</Badge>
                         </td>
                       </tr>
                     </tbody>
@@ -1157,8 +1125,12 @@ function FinancialDashboard() {
             </div>
 
             <Card ref={yoyRef} style={{ padding: 20, marginTop: 16 }}>
-              <SectionHeader title="YoY growth" subtitle="Indexed comparison: 2024 baseline vs 2025 performance." />
-              <YoYGrowthBars active={yoyIn} />
+              <SectionHeader
+                title="YoY growth"
+                subtitle={D.showYoySection ? 'Indexed comparison: 2024 baseline vs 2025 performance.' : 'Shown for FY 2025; switch year for prior-period context.'}
+              />
+              {D.showYoySection ? <p style={{ margin: '0 0 12px', fontSize: 13, color: C.mutedText }}>{D.yoyFootnote}</p> : null}
+              <YoYGrowthBars active={yoyIn} show={D.showYoySection} />
             </Card>
 
             <div
@@ -1181,15 +1153,15 @@ function FinancialDashboard() {
               >
                 <div>
                   <div style={{ opacity: 0.9, fontSize: 13 }}>Gross margin</div>
-                  <div style={{ fontWeight: 800, fontSize: 32, marginTop: 4 }}>27.2%</div>
+                  <div style={{ fontWeight: 800, fontSize: 32, marginTop: 4 }}>{D.profitabilityBanner.grossMargin}</div>
                 </div>
                 <div>
                   <div style={{ opacity: 0.9, fontSize: 13 }}>Net margin</div>
-                  <div style={{ fontWeight: 800, fontSize: 32, marginTop: 4 }}>3.9%</div>
+                  <div style={{ fontWeight: 800, fontSize: 32, marginTop: 4 }}>{D.profitabilityBanner.netMargin}</div>
                 </div>
                 <div>
                   <div style={{ opacity: 0.9, fontSize: 13 }}>Monthly avg revenue</div>
-                  <div style={{ fontWeight: 800, fontSize: 32, marginTop: 4 }}>{formatCurrency(avgRevDisplay)}</div>
+                  <div style={{ fontWeight: 800, fontSize: 32, marginTop: 4 }}>{D.profitabilityBanner.monthlyAvgRev}</div>
                 </div>
               </div>
             </div>
@@ -1197,7 +1169,7 @@ function FinancialDashboard() {
 
           {/* Monthly */}
           <section {...sectionProps('monthly')}>
-            <SectionHeader title="Monthly report" subtitle="Month-by-month P&amp;L and net income distribution." />
+            <SectionHeader title="Monthly report" subtitle={D.monthlySectionSubtitle} />
             <div
               style={{
                 display: 'grid',
@@ -1208,25 +1180,25 @@ function FinancialDashboard() {
             >
               <Card style={{ padding: 14 }}>
                 <div style={{ fontSize: 12, color: C.mutedText }}>Best month</div>
-                <div style={{ fontWeight: 800, fontSize: 22, marginTop: 4 }}>May {formatCurrency(93_000)}</div>
+                <div style={{ fontWeight: 800, fontSize: 22, marginTop: 4 }}>{D.miniKpis.bestLabel}</div>
               </Card>
               <Card style={{ padding: 14 }}>
                 <div style={{ fontSize: 12, color: C.mutedText }}>Worst</div>
-                <div style={{ fontWeight: 800, fontSize: 22, marginTop: 4 }}>Dec {formatCurrency(6_000)}</div>
+                <div style={{ fontWeight: 800, fontSize: 22, marginTop: 4 }}>{D.miniKpis.worstLabel}</div>
               </Card>
               <Card style={{ padding: 14 }}>
                 <div style={{ fontSize: 12, color: C.mutedText }}>Avg net/mo</div>
-                <div style={{ fontWeight: 800, fontSize: 22, marginTop: 4 }}>{formatCurrency(44_000)}</div>
+                <div style={{ fontWeight: 800, fontSize: 22, marginTop: 4 }}>{D.miniKpis.avgNetLabel}</div>
               </Card>
               <Card style={{ padding: 14 }}>
                 <div style={{ fontSize: 12, color: C.mutedText }}>All profitable</div>
-                <div style={{ fontWeight: 800, fontSize: 22, marginTop: 4 }}>12 / 12</div>
+                <div style={{ fontWeight: 800, fontSize: 22, marginTop: 4 }}>{D.miniKpis.profitableLabel}</div>
               </Card>
             </div>
 
             <Card ref={netBarsRef} style={{ padding: 18, marginBottom: 16 }}>
               <SectionHeader title="Net income" subtitle="Strong months in green; watch-list months in coral." />
-              <NetIncomeMiniBars active={netBarsIn} />
+              <NetIncomeMiniBars active={netBarsIn} months={D.months} />
             </Card>
 
             <Card style={{ padding: 0, overflow: 'hidden' }}>
@@ -1242,7 +1214,7 @@ function FinancialDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {MONTH_ROWS.map((m) => {
+                    {D.months.map((m) => {
                       const gp = m.revenue - m.cogs;
                       const peak = m.month === 'May' || m.month === 'Sep';
                       return (
@@ -1273,10 +1245,10 @@ function FinancialDashboard() {
                       <td className="cf-td">{formatMoneyFull(totals.revenue)}</td>
                       <td className="cf-td">{formatMoneyFull(totals.cogs)}</td>
                       <td className="cf-td">{formatMoneyFull(totals.gross)}</td>
-                      <td className="cf-td">{pctOf(totals.gross, totals.revenue)}</td>
+                      <td className="cf-td">{D.totalRowGpPct}</td>
                       <td className="cf-td">{formatMoneyFull(totals.opex)}</td>
                       <td className="cf-td">{formatMoneyFull(totals.net)}</td>
-                      <td className="cf-td">{pctOf(totals.net, totals.revenue)}</td>
+                      <td className="cf-td">{D.totalRowNetPct}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -1299,7 +1271,7 @@ function FinancialDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {OPEX_ITEMS.map(([name, annual, p]) => (
+                    {opexItemsUi.map(([name, annual, p]) => (
                       <tr key={name}>
                         <td className="cf-td" style={{ fontWeight: 600 }}>
                           {name}
@@ -1318,7 +1290,7 @@ function FinancialDashboard() {
             <Card ref={opexBarRef} style={{ padding: 18 }}>
               <SectionHeader title="Top 5 expense drivers" />
               <HorizontalBarChart
-                data={TOP5_OPEX.map((x) => ({ label: x.label, value: x.value }))}
+                data={top5ForChart}
                 max={top5Max}
                 active={opexBarIn}
                 barColor={C.midTeal}
@@ -1337,17 +1309,12 @@ function FinancialDashboard() {
                 marginBottom: 16,
               }}
             >
-              {[
-                { t: 'Labor', v: 4_120_000, b: '42.6%' },
-                { t: 'Materials', v: 2_510_000, b: '25.9%' },
-                { t: 'Utilities', v: 2_560_000, b: '26.5%' },
-                { t: 'Other', v: 480_000, b: '5.0%' },
-              ].map((x) => (
-                <Card key={x.t} style={{ padding: 16 }}>
-                  <div style={{ color: C.mutedText, fontSize: 13 }}>{x.t}</div>
-                  <div style={{ fontWeight: 800, fontSize: 26, marginTop: 6 }}>{formatCurrency(x.v)}</div>
+              {D.cogsDetailCards.map(([t, v, b]) => (
+                <Card key={t} style={{ padding: 16 }}>
+                  <div style={{ color: C.mutedText, fontSize: 13 }}>{t}</div>
+                  <div style={{ fontWeight: 800, fontSize: 26, marginTop: 6 }}>{formatCurrency(v)}</div>
                   <div style={{ marginTop: 10 }}>
-                    <Badge tone="teal">{x.b}</Badge>
+                    <Badge tone="teal">{b}</Badge>
                   </div>
                 </Card>
               ))}
@@ -1364,7 +1331,7 @@ function FinancialDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {COGS_LINE_ITEMS.map((row) => {
+                    {cogsLineUi.map((row) => {
                       const tint =
                         row.category === 'labor'
                           ? 'rgba(13,79,79,0.06)'
@@ -1394,7 +1361,7 @@ function FinancialDashboard() {
 
           {/* Utilities */}
           <section {...sectionProps('utilities')}>
-            <SectionHeader title="Utilities" subtitle="Energy and water intensity across the operating calendar." />
+            <SectionHeader title="Utilities" subtitle={D.utilitiesSubtitle} />
             <div
               style={{
                 display: 'grid',
@@ -1403,25 +1370,23 @@ function FinancialDashboard() {
                 marginBottom: 16,
               }}
             >
-              {[
-                { icon: '🔥', label: 'Gas', v: 1_207_000, p: '9.1%' },
-                { icon: '⚡', label: 'Electricity', v: 837_000, p: '6.3%' },
-                { icon: '💧', label: 'Water', v: 345_000, p: '2.6%' },
-                { icon: '🌊', label: 'Wastewater', v: 171_000, p: '1.3%' },
-              ].map((u) => (
-                <Card key={u.label} style={{ padding: 16 }}>
-                  <div style={{ fontSize: 22 }}>{u.icon}</div>
-                  <div style={{ fontWeight: 800, marginTop: 6, color: C.darkText }}>{u.label}</div>
-                  <div style={{ fontWeight: 800, fontSize: 24, marginTop: 6 }}>{formatCurrency(u.v)}</div>
-                  <div style={{ marginTop: 8 }}>
-                    <Badge tone="mid">{u.p}</Badge>
-                  </div>
-                </Card>
-              ))}
+              {D.utilityCards.map((u) => {
+                const tone =
+                  u.color === C.coral ? 'coral' : u.color === C.slate ? 'slate' : u.color === C.mint ? 'mint' : u.color === C.mid ? 'mid' : 'teal';
+                return (
+                  <Card key={u.label} style={{ padding: 16 }}>
+                    <div style={{ fontWeight: 800, marginTop: 0, color: C.darkText, fontSize: 15 }}>{u.label}</div>
+                    <div style={{ fontWeight: 800, fontSize: 24, marginTop: 6 }}>{formatCurrency(u.amount)}</div>
+                    <div style={{ marginTop: 8 }}>
+                      <Badge tone={tone}>{u.pct}</Badge>
+                    </div>
+                  </Card>
+                );
+              })}
             </div>
             <Card ref={utilChartRef} style={{ padding: 18, marginBottom: 16 }}>
               <SectionHeader title="Monthly utilities trend" subtitle="Stacked mix: gas, electricity, water, wastewater." />
-              <UtilitiesStackedChart active={utilChartIn} />
+              <UtilitiesStackedChart active={utilChartIn} utilityMonths={utilityMonthsScaled} />
             </Card>
             <Card style={{ padding: 0, overflow: 'hidden' }}>
               <div className="cf-table-scroll">
@@ -1437,17 +1402,17 @@ function FinancialDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {UTIL_K.map((r) => (
-                      <tr key={r.month}>
+                    {D.months.map((m) => (
+                      <tr key={m.month}>
                         <td className="cf-td" style={{ fontWeight: 700 }}>
-                          {r.month}
+                          {m.month}
                         </td>
-                        <td className="cf-td">{formatCurrency(r.gas * 1000)}</td>
-                        <td className="cf-td">{formatCurrency(r.elec * 1000)}</td>
-                        <td className="cf-td">{formatCurrency(r.water * 1000)}</td>
-                        <td className="cf-td">{formatCurrency(r.waste * 1000)}</td>
+                        <td className="cf-td">{formatCurrency(m.gas)}</td>
+                        <td className="cf-td">{formatCurrency(m.elec)}</td>
+                        <td className="cf-td">{formatCurrency(m.water)}</td>
+                        <td className="cf-td">{formatCurrency(m.waste)}</td>
                         <td className="cf-td" style={{ fontWeight: 800 }}>
-                          {formatCurrency((r.gas + r.elec + r.water + r.waste) * 1000)}
+                          {formatCurrency(m.gas + m.elec + m.water + m.waste)}
                         </td>
                       </tr>
                     ))}
@@ -1470,22 +1435,22 @@ function FinancialDashboard() {
             >
               <Card style={{ padding: 16 }}>
                 <div style={{ color: C.mutedText }}>Production payroll (COGS)</div>
-                <div style={{ fontWeight: 800, fontSize: 28, marginTop: 6 }}>{formatCurrency(4_120_000)}</div>
+                <div style={{ fontWeight: 800, fontSize: 28, marginTop: 6 }}>{formatCurrency(D.productionPayrollCard)}</div>
                 <div style={{ marginTop: 10 }}>
-                  <Badge tone="teal">31.0%</Badge>
+                  <Badge tone="teal">{D.productionPayrollPct}</Badge>
                 </div>
               </Card>
               <Card style={{ padding: 16 }}>
                 <div style={{ color: C.mutedText }}>Admin payroll (OpEx)</div>
-                <div style={{ fontWeight: 800, fontSize: 28, marginTop: 6 }}>{formatCurrency(1_230_000)}</div>
+                <div style={{ fontWeight: 800, fontSize: 28, marginTop: 6 }}>{formatCurrency(D.adminPayrollCard)}</div>
                 <div style={{ marginTop: 10 }}>
-                  <Badge tone="mid">9.2%</Badge>
+                  <Badge tone="mid">{D.adminPayrollPct}</Badge>
                 </div>
               </Card>
             </div>
             <Card ref={payrollBarsRef} style={{ padding: 18, marginBottom: 16 }}>
               <SectionHeader title="Payroll components" subtitle="Annual totals with implied monthly run-rate." />
-              <PayrollBarList active={payrollBarsIn} />
+              <PayrollBarList active={payrollBarsIn} bars={payrollBarsUi} />
             </Card>
             <div
               style={{
@@ -1508,15 +1473,16 @@ function FinancialDashboard() {
               >
                 <div>
                   <div style={{ opacity: 0.85, fontSize: 13 }}>Total payroll</div>
-                  <div style={{ fontSize: 26, fontWeight: 800, marginTop: 4 }}>{formatCurrency(5_350_000)}</div>
+                  <div style={{ fontSize: 26, fontWeight: 800, marginTop: 4 }}>{formatCurrency(D.totalPayroll)}</div>
                 </div>
                 <div>
-                  <div style={{ opacity: 0.85, fontSize: 13 }}>Headcount cost</div>
-                  <div style={{ fontSize: 26, fontWeight: 800, marginTop: 4 }}>40.3% of revenue</div>
+                  <div style={{ opacity: 0.85, fontSize: 13 }}>Headcount cost (avg / mo)</div>
+                  <div style={{ fontSize: 26, fontWeight: 800, marginTop: 4 }}>{formatCurrency(D.headcountCost)}</div>
+                  <div style={{ opacity: 0.85, fontSize: 12, marginTop: 4 }}>{pctOf(D.totalPayroll, displayRevenue)} of revenue</div>
                 </div>
                 <div>
                   <div style={{ opacity: 0.85, fontSize: 13 }}>Burden rate</div>
-                  <div style={{ fontSize: 26, fontWeight: 800, marginTop: 4 }}>~18%</div>
+                  <div style={{ fontSize: 26, fontWeight: 800, marginTop: 4 }}>{D.burdenRate}%</div>
                 </div>
               </div>
             </div>
